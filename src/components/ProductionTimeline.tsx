@@ -245,8 +245,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({ data }) => {
 
   return (
     <div className="space-y-6">
-
-       {/* Compact Legend */}
+      {/* Compact Legend */}
       <div className="bg-gray-700 rounded-lg p-4">
         <h4 className="text-sm font-medium text-white mb-3">Legend</h4>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
@@ -381,7 +380,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({ data }) => {
         );
       })}
 
-
       {/* Stoppage Modal */}
       {selectedHour && (
         <StoppageModal
@@ -396,4 +394,117 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({ data }) => {
   );
 };
 
-export default ProductionTimeline;
+// Sample data generator
+const generateSampleData = (): ProductionTimelineDay[] => {
+  const createHour = (
+    hour: number,
+    status: 'running' | 'stopped' | 'off',
+    unitsProduced: number,
+    operator: { id: string; username: string } | null,
+    mold: { id: string; name: string } | null,
+    stoppages: StoppageRecord[] = []
+  ): ProductionHour => ({
+    hour,
+    status,
+    unitsProduced,
+    defectiveUnits: Math.floor(unitsProduced * 0.02),
+    operator,
+    mold,
+    stoppages
+  });
+
+  const operators = [
+    { id: 'op1', username: 'John Smith' },
+    { id: 'op2', username: 'Emma Johnson' },
+    { id: 'op3', username: 'Michael Brown' }
+  ];
+
+  const molds = [
+    { id: 'mold-a', name: 'Mold A-125' },
+    { id: 'mold-b', name: 'Mold B-87' },
+    { id: 'mold-c', name: 'Mold C-42' }
+  ];
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  return [
+    {
+      date: yesterday.toISOString().split('T')[0],
+      hours: [
+        createHour(0, 'off', 0, null, null),
+        createHour(1, 'off', 0, null, null),
+        createHour(2, 'off', 0, null, null),
+        createHour(3, 'off', 0, null, null),
+        createHour(4, 'off', 0, null, null),
+        createHour(5, 'running', 45, operators[0], molds[0]),
+        createHour(6, 'running', 120, operators[0], molds[0]),
+        createHour(7, 'running', 135, operators[0], molds[0]),
+        createHour(8, 'running', 125, operators[0], molds[0]),
+        createHour(9, 'stopped', 0, null, molds[0], [
+          { id: 'st1', reason: 'breakdown', description: 'Motor failure', duration: 45, startTime: '', endTime: '' }
+        ]),
+        createHour(10, 'stopped', 0, null, molds[0], [
+          { id: 'st2', reason: 'maintenance', description: 'Scheduled calibration', duration: 30, startTime: '', endTime: '' }
+        ]),
+        createHour(11, 'running', 65, operators[1], molds[0]),
+        createHour(12, 'running', 115, operators[1], molds[0]),
+        createHour(13, 'running', 125, operators[1], molds[0]),
+        createHour(14, 'running', 0, operators[1], molds[1]), // Running with no output
+        createHour(15, 'running', 140, operators[1], molds[1]),
+        createHour(16, 'running', 130, operators[1], molds[1]),
+        createHour(17, 'running', 110, operators[1], molds[1]),
+        createHour(18, 'running', 95, operators[2], molds[1]),
+        createHour(19, 'stopped', 0, operators[2], molds[1], [
+          { id: 'st3', reason: 'material_shortage', description: 'Resin depleted', duration: 25, startTime: '', endTime: '' }
+        ]),
+        createHour(20, 'running', 85, operators[2], molds[1]),
+        createHour(21, 'running', 90, operators[2], molds[1]),
+        createHour(22, 'running', 75, operators[2], molds[1]),
+        createHour(23, 'off', 0, null, null)
+      ]
+    },
+    {
+      date: today.toISOString().split('T')[0],
+      hours: [
+        createHour(0, 'off', 0, null, null),
+        createHour(1, 'off', 0, null, null),
+        createHour(2, 'off', 0, null, null),
+        createHour(3, 'off', 0, null, null),
+        createHour(4, 'running', 40, operators[2], molds[2]),
+        createHour(5, 'running', 115, operators[2], molds[2]),
+        createHour(6, 'running', 125, operators[2], molds[2]),
+        createHour(7, 'running', 135, operators[0], molds[2]),
+        createHour(8, 'running', 145, operators[0], molds[2]),
+        createHour(9, 'stopped', 0, null, null, [
+          { id: 'st4', reason: 'mold_change', description: 'Changing to Mold A', duration: 55, startTime: '', endTime: '' }
+        ]),
+        createHour(10, 'running', 70, operators[0], molds[0]),
+        createHour(11, 'running', 125, operators[0], molds[0]),
+        createHour(12, 'running', 130, operators[0], molds[0]),
+        createHour(13, 'running', 0, operators[1], molds[0]), // Running with no output
+        createHour(14, 'running', 115, operators[1], molds[0]),
+        createHour(15, 'running', 120, operators[1], molds[0]),
+        createHour(16, 'running', 125, operators[1], molds[0]),
+        createHour(17, 'running', 110, operators[1], molds[0]),
+        createHour(18, 'stopped', 0, null, null, [
+          { id: 'st5', reason: 'other', description: 'Power outage', duration: 20, startTime: '', endTime: '' }
+        ]),
+        createHour(19, 'running', 85, operators[2], molds[0]),
+        createHour(20, 'running', 90, operators[2], molds[0]),
+        createHour(21, 'running', 95, operators[2], molds[0]),
+        createHour(22, 'running', 80, operators[2], molds[0]),
+        createHour(23, 'off', 0, null, null)
+      ]
+    }
+  ];
+};
+
+// Component that renders the timeline with sample data
+const ProductionTimelineWithSampleData: React.FC = () => {
+  const sampleData = generateSampleData();
+  return <ProductionTimeline data={sampleData} />;
+};
+
+export default ProductionTimelineWithSampleData;

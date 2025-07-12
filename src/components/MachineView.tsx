@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Machine, ProductionTimelineDay, MachineStats } from '../types';
 import apiService from '../services/api';
 import ProductionTimeline from './ProductionTimeline';
+
 import {
   ArrowLeft,
   Activity,
@@ -16,6 +17,9 @@ import {
   X,
   Save
 } from 'lucide-react';
+
+import ProductionTimelineWithSampleData from './ProductionTimeline';
+
 
 const MachineView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -358,7 +362,8 @@ const MachineView: React.FC = () => {
           </p>
         </div>
         <div className="p-6">
-          <ProductionTimeline data={timeline} />
+          {/* <ProductionTimeline data={timeline} />  */} {/* Uncomment this line */}
+          <ProductionTimelineWithSampleData/>  {/* Comment this line */}
         </div>
       </div>
     </div>

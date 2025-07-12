@@ -26,9 +26,9 @@ const Layout: React.FC = () => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     ...(isAdmin ? [
+      { name: 'Users', href: '/users', icon: User },
       { name: 'Departments', href: '/departments', icon: Building2 },
       { name: 'Configuration', href: '/config', icon: Settings },
-      { name: 'Users', href: '/users', icon: User },
     ] : []),
   ];
 
