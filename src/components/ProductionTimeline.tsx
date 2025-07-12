@@ -67,9 +67,8 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Production Summary */}
+          {/* Production Summary - Removed header */}
           <div className="bg-gray-700 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-white mb-3">Production Summary</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-400">Units Produced:</span>

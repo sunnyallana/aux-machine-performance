@@ -79,6 +79,16 @@ class ApiService {
     });
   }
 
+  async getAllDepartments() {
+    return this.request('/departments/admin/all');
+  }
+
+  async deleteDepartment(id: string) {
+    return this.request(`/departments/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Machines
   async getMachinesByDepartment(departmentId: string) {
     return this.request(`/machines/department/${departmentId}`);
@@ -95,12 +105,25 @@ class ApiService {
     });
   }
 
+  async updateMachine(id: string, machineData: any) {
+    return this.request(`/machines/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(machineData),
+    });
+  }
+
   async updateMachinePosition(id: string, position: { x: number; y: number }) {
     return this.request(`/machines/${id}/position`, {
       method: 'PATCH',
       body: JSON.stringify(position),
     });
   }
+
+  async deleteMachine(id: string) {
+  return this.request(`/machines/${id}`, {
+    method: 'DELETE',
+  });
+}
 
   // Analytics
   async getProductionTimeline(machineId: string) {

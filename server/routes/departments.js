@@ -10,13 +10,22 @@ router.get('/', auth, async (req, res) => {
   try {
     let query = { isActive: true };
     
-    // Operators can only see their department
     if (req.user.role === 'operator' && req.user.departmentId) {
       query._id = req.user.departmentId._id;
     }
 
-    const departments = await Department.find(query);
-    res.json(departments);
+    const departments = await Department.find(query).lean();
+    
+    // Add machine counts to each department
+    const departmentsWithCounts = await Promise.all(departments.map(async dept => {
+      const machineCount = await Machine.countDocuments({ 
+        departmentId: dept._id, 
+        isActive: true 
+      });
+      return { ...dept, machineCount };
+    }));
+
+    res.json(departmentsWithCounts);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -74,21 +83,45 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
-// Delete department (Admin only)
-router.delete('/:id', auth, adminAuth, async (req, res) => {
+// New endpoint to get all departments (including inactive)
+router.get('/admin/all', auth, adminAuth, async (req, res) => {
   try {
-    const department = await Department.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false },
-      { new: true }
-    );
-    if (!department) {
-      return res.status(404).json({ message: 'Department not found' });
-    }
-    res.json({ message: 'Department deactivated successfully' });
+    const departments = await Department.find({}).lean();
+    
+    const departmentsWithCounts = await Promise.all(departments.map(async dept => {
+      const machineCount = await Machine.countDocuments({ 
+        departmentId: dept._id,
+        isActive: true 
+      });
+      return { ...dept, machineCount };
+    }));
+
+    res.json(departmentsWithCounts);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
+// Delete department (Admin only)
+router.delete('/:id', auth, adminAuth, async (req, res) => {
+  try {
+    // Check if department exists
+    const department = await Department.findById(req.params.id);
+    if (!department) {
+      return res.status(404).json({ message: 'Department not found' });
+    }
+
+    // Delete associated machines first
+    await Machine.deleteMany({ departmentId: req.params.id });
+
+    // Then delete department
+    await Department.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Department and associated machines deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 
 module.exports = router;

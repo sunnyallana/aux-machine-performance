@@ -12,6 +12,7 @@ export interface Department {
   description?: string;
   layout?: any;
   machines?: Machine[];
+  machineCount: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

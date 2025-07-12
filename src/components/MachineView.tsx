@@ -11,7 +11,10 @@ import {
   Clock,
   Gauge,
   Power,
-  Settings
+  Settings,
+  Edit,
+  X,
+  Save
 } from 'lucide-react';
 
 const MachineView: React.FC = () => {
@@ -23,6 +26,11 @@ const MachineView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('24h');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: ''
+  });
 
   useEffect(() => {
     if (id) {
@@ -40,12 +48,33 @@ const MachineView: React.FC = () => {
       ]);
       
       setMachine(machineData);
+      setEditForm({
+        name: machineData.name,
+        description: machineData.description || ''
+      });
       setTimeline(timelineData);
       setStats(statsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch machine data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!machine || !id) return;
+    
+    try {
+      const updatedMachine = await apiService.updateMachine(id, editForm);
+      setMachine(updatedMachine);
+      setIsEditing(false);
+    } catch (err) {
+      setError('Failed to update machine');
     }
   };
 
@@ -107,15 +136,95 @@ const MachineView: React.FC = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-white">{machine.name}</h1>
-            <p className="text-gray-400">{machine.description}</p>
-          </div>
+          {isEditing ? (
+            <div className="space-y-2 flex-1">
+              <input
+                name="name"
+                value={editForm.name}
+                onChange={handleEditChange}
+                className="text-2xl font-bold text-white bg-gray-700 border border-gray-600 rounded px-2 py-1 w-full"
+              />
+              <textarea
+                name="description"
+                value={editForm.description}
+                onChange={handleEditChange}
+                className="text-gray-400 bg-gray-700 border border-gray-600 rounded px-2 py-1 w-full text-sm"
+                rows={2}
+              />
+            </div>
+          ) : (
+            <div>
+              <h1 className="text-2xl font-bold text-white">{machine.name}</h1>
+              <p className="text-gray-400">{machine.description}</p>
+            </div>
+          )}
         </div>
         
-        <div className={`flex items-center space-x-2 px-3 py-2 rounded-md border ${getStatusColor(machine.status)}`}>
-          {getStatusIcon(machine.status)}
-          <span className="font-medium capitalize">{machine.status}</span>
+        <div className="flex items-center space-x-3">
+          <div className={`flex items-center space-x-2 px-3 py-2 rounded-md border ${getStatusColor(machine.status)}`}>
+            {getStatusIcon(machine.status)}
+            <span className="font-medium capitalize">{machine.status}</span>
+          </div>
+          
+          {isEditing ? (
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+              title="Edit machine details"
+            >
+              <Edit className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Key Metrics - Compact Layout */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+          <TrendingUp className="h-6 w-6 text-green-400 mr-3" />
+          <div>
+            <p className="text-xs text-gray-400">Units</p>
+            <p className="text-lg font-semibold text-white">{stats.totalUnitsProduced}</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+          <Gauge className="h-6 w-6 text-yellow-400 mr-3" />
+          <div>
+            <p className="text-xs text-gray-400">OEE</p>
+            <p className="text-lg font-semibold text-yellow-400">{stats.oee}%</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+          <Clock className="h-6 w-6 text-blue-400 mr-3" />
+          <div>
+            <p className="text-xs text-gray-400">MTBF</p>
+            <p className="text-lg font-semibold text-blue-400">{stats.mtbf}h</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+          <Activity className="h-6 w-6 text-purple-400 mr-3" />
+          <div>
+            <p className="text-xs text-gray-400">MTTR</p>
+            <p className="text-lg font-semibold text-purple-400">{stats.mttr}m</p>
+          </div>
         </div>
       </div>
 
@@ -140,49 +249,6 @@ const MachineView: React.FC = () => {
               {period.label}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400">Units Produced</p>
-              <p className="text-xl font-semibold text-white">{stats.totalUnitsProduced}</p>
-            </div>
-            <TrendingUp className="h-8 w-8 text-green-400" />
-          </div>
-        </div>
-
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400">OEE</p>
-              <p className="text-xl font-semibold text-yellow-400">{stats.oee}%</p>
-            </div>
-            <Gauge className="h-8 w-8 text-yellow-400" />
-          </div>
-        </div>
-
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400">MTBF</p>
-              <p className="text-xl font-semibold text-blue-400">{stats.mtbf}h</p>
-            </div>
-            <Clock className="h-8 w-8 text-blue-400" />
-          </div>
-        </div>
-
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400">MTTR</p>
-              <p className="text-xl font-semibold text-purple-400">{stats.mttr}m</p>
-            </div>
-            <Activity className="h-8 w-8 text-purple-400" />
-          </div>
         </div>
       </div>
 

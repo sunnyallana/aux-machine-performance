@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const Machine = require('./Machine');
+
 
 const sensorSchema = new mongoose.Schema({
   name: {
@@ -26,6 +28,16 @@ const sensorSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+sensorSchema.pre('save', async function(next) {
+  if (!mongoose.Types.ObjectId.isValid(this.machineId)) {
+    const machineExists = await Machine.exists({ _id: this.machineId });
+    if (!machineExists) {
+      throw new Error('Invalid machine reference');
+    }
+  }
+  next();
 });
 
 module.exports = mongoose.model('Sensor', sensorSchema);

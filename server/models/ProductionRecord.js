@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Machine = require('./Machine');
 
 const productionRecordSchema = new mongoose.Schema({
   machineId: {
@@ -37,6 +38,16 @@ const productionRecordSchema = new mongoose.Schema({
   }]
 }, {
   timestamps: true
+});
+
+productionRecordSchema.pre('save', async function(next) {
+  if (!mongoose.Types.ObjectId.isValid(this.machineId)) {
+    const machineExists = await Machine.exists({ _id: this.machineId });
+    if (!machineExists) {
+      throw new Error('Invalid machine reference');
+    }
+  }
+  next();
 });
 
 module.exports = mongoose.model('ProductionRecord', productionRecordSchema);

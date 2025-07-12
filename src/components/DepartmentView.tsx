@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Department, Machine } from '../types';
 import apiService from '../services/api';
@@ -11,7 +11,10 @@ import {
   Plus,
   Edit,
   Power,
-  Gauge
+  Gauge,
+  Trash2,
+  Save,
+  X
 } from 'lucide-react';
 
 const DepartmentView: React.FC = () => {
@@ -22,6 +25,17 @@ const DepartmentView: React.FC = () => {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isAddingMachine, setIsAddingMachine] = useState(false);
+  const [newMachine, setNewMachine] = useState({
+    name: '',
+    description: '',
+    status: 'stopped' as 'running' | 'stopped' | 'maintenance' | 'error'
+  });
+  const [editLayoutMode, setEditLayoutMode] = useState(false);
+  const [positions, setPositions] = useState<{[key: string]: {x: number; y: number}}>({});
+  const [draggingMachineId, setDraggingMachineId] = useState<string | null>(null);
+  const layoutContainerRef = useRef<HTMLDivElement>(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (id) {
@@ -31,9 +45,17 @@ const DepartmentView: React.FC = () => {
 
   const fetchDepartmentData = async () => {
     try {
+      setLoading(true);
       const deptData = await apiService.getDepartment(id!);
       setDepartment(deptData);
       setMachines(deptData.machines || []);
+      
+      // Initialize positions
+      const initialPositions: {[key: string]: {x: number; y: number}} = {};
+      deptData.machines?.forEach(machine => {
+        initialPositions[machine._id] = { ...machine.position };
+      });
+      setPositions(initialPositions);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch department data');
     } finally {
@@ -42,7 +64,9 @@ const DepartmentView: React.FC = () => {
   };
 
   const handleMachineClick = (machineId: string) => {
-    navigate(`/machine/${machineId}`);
+    if (!editLayoutMode) {
+      navigate(`/machine/${machineId}`);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -62,6 +86,105 @@ const DepartmentView: React.FC = () => {
       case 'maintenance': return 'Maintenance';
       case 'error': return 'Error';
       default: return 'Unknown';
+    }
+  };
+
+  const handleAddMachine = async () => {
+    try {
+      const createdMachine = await apiService.createMachine({
+        ...newMachine,
+        departmentId: id
+      });
+      
+      setMachines([...machines, createdMachine]);
+      setPositions({
+        ...positions,
+        [createdMachine._id]: createdMachine.position
+      });
+      setIsAddingMachine(false);
+      setNewMachine({
+        name: '',
+        description: '',
+        status: 'stopped'
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add machine');
+    }
+  };
+
+  const handleDeleteMachine = async (machineId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to permanently delete this machine? All associated data will be lost.')) {
+      try {
+        await apiService.deleteMachine(machineId);
+        setMachines(machines.filter(m => m._id !== machineId));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete machine');
+      }
+    }
+  };
+
+  const handleMouseDown = (machineId: string, e: React.MouseEvent) => {
+    if (!editLayoutMode || !layoutContainerRef.current) return;
+    e.stopPropagation();
+    
+    // Calculate offset from mouse to machine position
+    const containerRect = layoutContainerRef.current.getBoundingClientRect();
+    const machineX = positions[machineId]?.x || 0;
+    const machineY = positions[machineId]?.y || 0;
+    
+    dragOffset.current = {
+      x: e.clientX - containerRect.left - machineX,
+      y: e.clientY - containerRect.top - machineY
+    };
+    
+    setDraggingMachineId(machineId);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!editLayoutMode || !draggingMachineId || !layoutContainerRef.current) return;
+    
+    const containerRect = layoutContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - containerRect.left - dragOffset.current.x;
+    const y = e.clientY - containerRect.top - dragOffset.current.y;
+    
+    // Keep within container bounds
+    const boundedX = Math.max(10, Math.min(x, containerRect.width - 210));
+    const boundedY = Math.max(10, Math.min(y, containerRect.height - 210));
+    
+    setPositions(prev => ({
+      ...prev,
+      [draggingMachineId]: { x: boundedX, y: boundedY }
+    }));
+  };
+
+  const handleMouseUp = async () => {
+    if (!editLayoutMode || !draggingMachineId) return;
+    
+    try {
+      // Only save if position actually changed
+      await apiService.updateMachinePosition(
+        draggingMachineId, 
+        positions[draggingMachineId]
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update machine position');
+    } finally {
+      setDraggingMachineId(null);
+    }
+  };
+
+  const handleSaveLayout = async () => {
+    try {
+      // Save all positions
+      await Promise.all(
+        Object.entries(positions).map(([machineId, position]) => 
+          apiService.updateMachinePosition(machineId, position)
+        )
+      );
+      setEditLayoutMode(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save layout');
     }
   };
 
@@ -111,12 +234,18 @@ const DepartmentView: React.FC = () => {
         
         {isAdmin && (
           <div className="flex items-center space-x-2">
-            <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={() => setIsAddingMachine(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
               <Plus className="h-4 w-4" />
               <span>Add Machine</span>
             </button>
-            <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors">
-              <Settings className="h-5 w-5" />
+            <button 
+              onClick={() => setEditLayoutMode(!editLayoutMode)}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+            >
+              {editLayoutMode ? <Save className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
             </button>
           </div>
         )}
@@ -175,9 +304,12 @@ const DepartmentView: React.FC = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">Machine Layout</h2>
             {isAdmin && (
-              <button className="text-blue-400 hover:text-blue-300 text-sm flex items-center space-x-1">
+              <button 
+                onClick={() => setEditLayoutMode(!editLayoutMode)}
+                className="text-blue-400 hover:text-blue-300 text-sm flex items-center space-x-1"
+              >
                 <Edit className="h-4 w-4" />
-                <span>Edit Layout</span>
+                <span>{editLayoutMode ? 'Save Layout' : 'Edit Layout'}</span>
               </button>
             )}
           </div>
@@ -185,16 +317,47 @@ const DepartmentView: React.FC = () => {
 
         <div className="p-6">
           {machines.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div 
+              ref={layoutContainerRef}
+              className="relative w-full min-h-[700px] bg-gray-900/50 rounded-lg border border-dashed border-gray-700"
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
               {machines.map((machine) => (
                 <div
                   key={machine._id}
                   onClick={() => handleMachineClick(machine._id)}
-                  className="bg-gray-700 rounded-lg p-4 border border-gray-600 hover:border-blue-500 cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10"
+                  className={`absolute bg-gray-700 rounded-lg p-4 border ${
+                    editLayoutMode 
+                      ? 'border-blue-500 cursor-move' 
+                      : 'border-gray-600 hover:border-blue-500'
+                  } transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
+                  style={{
+                    left: `${positions[machine._id]?.x || 0}px`,
+                    top: `${positions[machine._id]?.y || 0}px`,
+                    width: '200px',
+                    zIndex: draggingMachineId === machine._id ? 10 : 1,
+                    cursor: editLayoutMode ? 'move' : 'pointer',
+                    transform: draggingMachineId === machine._id ? 'scale(1.02)' : 'none',
+                    transition: draggingMachineId === machine._id ? 'none' : 'all 0.2s ease',
+                    boxShadow: draggingMachineId === machine._id ? '0 10px 25px rgba(0, 0, 0, 0.3)' : 'none'
+                  }}
+                  onMouseDown={(e) => handleMouseDown(machine._id, e)}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium text-white truncate">{machine.name}</h3>
-                    <div className={`h-3 w-3 rounded-full ${getStatusColor(machine.status)}`}></div>
+                    <div className="flex items-center space-x-2">
+                      <div className={`h-3 w-3 rounded-full ${getStatusColor(machine.status)}`}></div>
+                      {editLayoutMode && (
+                        <button
+                          onClick={(e) => handleDeleteMachine(machine._id, e)}
+                          className="text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
                   <p className="text-sm text-gray-400 mb-3 line-clamp-2">
@@ -228,12 +391,6 @@ const DepartmentView: React.FC = () => {
                       </span>
                     </div>
                   </div>
-
-                  <div className="mt-3 pt-3 border-t border-gray-600">
-                    <button className="w-full text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors">
-                      View Details →
-                    </button>
-                  </div>
                 </div>
               ))}
             </div>
@@ -245,7 +402,10 @@ const DepartmentView: React.FC = () => {
                 This department doesn't have any machines configured yet.
               </p>
               {isAdmin && (
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                <button 
+                  onClick={() => setIsAddingMachine(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
                   Add First Machine
                 </button>
               )}
@@ -253,6 +413,110 @@ const DepartmentView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Add Machine Modal */}
+      {isAddingMachine && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Add New Machine</h3>
+                <button 
+                  onClick={() => setIsAddingMachine(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Machine Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={newMachine.name}
+                  onChange={(e) => setNewMachine({...newMachine, name: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={newMachine.description}
+                  onChange={(e) => setNewMachine({...newMachine, description: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Initial Status
+                </label>
+                <select
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={newMachine.status}
+                  onChange={(e) => setNewMachine({...newMachine, status: e.target.value as any})}
+                >
+                  <option value="running">Running</option>
+                  <option value="stopped">Stopped</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="error">Error</option>
+                </select>
+              </div>
+              
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={() => setIsAddingMachine(false)}
+                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddMachine}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Add Machine
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Layout Controls */}
+      {editLayoutMode && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 flex justify-between items-center">
+          <div className="text-yellow-400">
+            <p className="flex items-center">
+              <Edit className="h-4 w-4 mr-2" />
+              <span>Layout Edit Mode: Drag machines to reposition, click trash icon to delete</span>
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setEditLayoutMode(false)}
+              className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveLayout}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Layout
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

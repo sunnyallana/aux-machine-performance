@@ -1,6 +1,9 @@
 const express = require('express');
 const Machine = require('../models/Machine');
 const SignalData = require('../models/SignalData');
+const Sensor = require('../models/Sensor');
+const ProductionRecord = require('../models/ProductionRecord');
+const StoppageRecord = require('../models/StoppageRecord');
 const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -92,15 +95,24 @@ router.patch('/:id/position', auth, adminAuth, async (req, res) => {
 // Delete machine (Admin only)
 router.delete('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const machine = await Machine.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false },
-      { new: true }
-    );
+    const machineId = req.params.id;
+    
+    // First delete all related data
+    await Promise.all([
+      Sensor.deleteMany({ machineId }),
+      ProductionRecord.deleteMany({ machineId }),
+      StoppageRecord.deleteMany({ machineId }),
+      SignalData.deleteMany({ machineId })
+    ]);
+    
+    // Then delete the machine
+    const machine = await Machine.findByIdAndDelete(machineId);
+    
     if (!machine) {
       return res.status(404).json({ message: 'Machine not found' });
     }
-    res.json({ message: 'Machine deactivated successfully' });
+    
+    res.json({ message: 'Machine and all related data deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

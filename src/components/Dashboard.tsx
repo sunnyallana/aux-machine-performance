@@ -102,7 +102,7 @@ const Dashboard: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-400">Active Machines</p>
               <p className="text-2xl font-semibold text-white">
-                {departments.reduce((total, dept) => total + (dept.machines?.length || 0), 0)}
+                {departments.reduce((total, dept) => total + dept.machineCount, 0)}
               </p>
             </div>
           </div>
@@ -160,7 +160,7 @@ const Dashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-400">Machines</span>
                     <span className="text-white font-medium">
-                      {department.machines?.length || 0}
+                      {department.machineCount || 0}
                     </span>
                   </div>
                   
