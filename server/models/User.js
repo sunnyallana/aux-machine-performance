@@ -37,7 +37,16 @@ const userSchema = new mongoose.Schema({
     default: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    transform: function(doc, ret) {
+      // Ensure departmentId is populated when toJSON is called
+      if (ret.departmentId && typeof ret.departmentId === 'object') {
+        ret.departmentId = ret.departmentId._id;
+      }
+      return ret;
+    }
+  }
 });
 
 userSchema.pre('save', async function(next) {

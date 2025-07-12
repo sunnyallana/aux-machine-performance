@@ -9,6 +9,7 @@ const sensorRoutes = require('./routes/sensors');
 const signalRoutes = require('./routes/signals');
 const configRoutes = require('./routes/config');
 const analyticsRoutes = require('./routes/analytics');
+const userRoutes = require('./routes/users');
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use('/api/sensors', sensorRoutes);
 app.use('/api/signals', signalRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/users', userRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

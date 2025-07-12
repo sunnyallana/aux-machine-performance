@@ -125,6 +125,31 @@ class ApiService {
   });
 }
 
+  // Users
+  async getUsers() {
+    return this.request('/users');
+  }
+
+  async createUser(user: any) {
+    return this.request('/users', {
+      method: 'POST',
+      body: JSON.stringify(user),
+    });
+  }
+
+  async updateUser(id: string, user: any) {
+    return this.request(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(user),
+    });
+  }
+
+  async deleteUser(id: string) {
+    return this.request(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Analytics
   async getProductionTimeline(machineId: string) {
     return this.request(`/analytics/production-timeline/${machineId}`);
