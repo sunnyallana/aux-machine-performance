@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProductionTimelineDay, ProductionHour, StoppageRecord } from '../types';
 import { format, parseISO } from 'date-fns';
-import { Clock, User, Wrench, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Clock, User, Wrench, AlertTriangle, X } from 'lucide-react';
 
 interface ProductionTimelineProps {
   data: ProductionTimelineDay[];
@@ -13,7 +13,6 @@ interface StoppageModalProps {
   hour: ProductionHour;
   date: string;
   onAddStoppage: (stoppage: Partial<StoppageRecord>) => void;
-  onUpdateStoppage: (id: string, stoppage: Partial<StoppageRecord>) => void;
 }
 
 const StoppageModal: React.FC<StoppageModalProps> = ({
@@ -21,8 +20,7 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
   onClose,
   hour,
   date,
-  onAddStoppage,
-  onUpdateStoppage
+  onAddStoppage
 }) => {
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
@@ -56,7 +54,7 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
       <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md mx-4">
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <h3 className="text-lg font-semibold text-white">
-            Production Details - {format(parseISO(date), 'MMM dd')}, {hour.hour}:00
+            Production Details - {format(parseISO(date), 'MMM dd')}, {hour.hour}:00 - {(hour.hour + 1).toString().padStart(2, '0')}:00
           </h3>
           <button
             onClick={onClose}
@@ -67,7 +65,6 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Production Summary - Removed header */}
           <div className="bg-gray-700 rounded-lg p-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -91,7 +88,6 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
             </div>
           </div>
 
-          {/* Operator and Mold Info */}
           {(hour.operator || hour.mold) && (
             <div className="bg-gray-700 rounded-lg p-4">
               <h4 className="text-sm font-medium text-white mb-3">Shift Information</h4>
@@ -114,7 +110,6 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
             </div>
           )}
 
-          {/* Existing Stoppages */}
           {hour.stoppages.length > 0 && (
             <div className="bg-gray-700 rounded-lg p-4">
               <h4 className="text-sm font-medium text-white mb-3">Stoppages</h4>
@@ -126,7 +121,7 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
                         {stoppage.reason.replace('_', ' ')}
                       </span>
                       <span className="text-xs text-gray-400">
-                        {format(parseISO(stoppage.startTime), 'HH:mm')}
+                        {stoppage.duration} min
                       </span>
                     </div>
                     {stoppage.description && (
@@ -138,7 +133,6 @@ const StoppageModal: React.FC<StoppageModalProps> = ({
             </div>
           )}
 
-          {/* Add New Stoppage */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -205,23 +199,39 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({ data }) => {
     return 'bg-gray-600';
   };
 
-  const getHourHeight = (hour: ProductionHour) => {
-    const maxUnits = Math.max(...data.flatMap(day => 
-      day.hours.map(h => h.unitsProduced)
-    ));
-    if (maxUnits === 0) return 'h-2';
-    const height = Math.max(8, (hour.unitsProduced / maxUnits) * 40);
-    return `h-${Math.min(40, Math.round(height / 4) * 4)}`;
-  };
-
   const handleAddStoppage = async (stoppage: Partial<StoppageRecord>) => {
-    // This would call the API to add a stoppage
     console.log('Adding stoppage:', stoppage);
   };
 
-  const handleUpdateStoppage = async (id: string, stoppage: Partial<StoppageRecord>) => {
-    // This would call the API to update a stoppage
-    console.log('Updating stoppage:', id, stoppage);
+  const calculateAssignmentSegments = (hours: ProductionHour[], type: 'operator' | 'mold') => {
+    const segments: { start: number; end: number; value: any }[] = [];
+    let currentStart = -1;
+    let currentValue = null;
+
+    for (let i = 0; i <= hours.length; i++) {
+      const hour = i < hours.length ? hours[i] : null;
+      const value = hour ? (type === 'operator' ? hour.operator?.id : hour.mold?.id) : null;
+
+      if (value !== currentValue) {
+        if (currentValue !== null && currentStart !== -1) {
+          segments.push({
+            start: currentStart,
+            end: i - 1,
+            value: currentValue
+          });
+        }
+        
+        if (value) {
+          currentStart = i;
+          currentValue = value;
+        } else {
+          currentStart = -1;
+          currentValue = null;
+        }
+      }
+    }
+
+    return segments;
   };
 
   if (!data || data.length === 0) {
@@ -235,41 +245,108 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({ data }) => {
 
   return (
     <div className="space-y-6">
-      {/* Timeline Chart */}
-      <div className="space-y-4">
-        {data.map((day) => (
+
+       {/* Compact Legend */}
+      <div className="bg-gray-700 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-white mb-3">Legend</h4>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <span className="text-gray-300">Production</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+            <span className="text-gray-300">Running (Low)</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-red-500 rounded"></div>
+            <span className="text-gray-300">Stoppage</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-gray-600 rounded"></div>
+            <span className="text-gray-300">No Production</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            <span className="text-gray-300">Operator</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-purple-500 rounded"></div>
+            <span className="text-gray-300">Mold</span>
+          </div>
+        </div>
+      </div>
+      
+      {data.map((day) => {
+        const operatorSegments = calculateAssignmentSegments(day.hours, 'operator');
+        const moldSegments = calculateAssignmentSegments(day.hours, 'mold');
+        
+        return (
           <div key={day.date} className="bg-gray-700 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-white">
+            {/* Date header */}
+            <div className="mb-4">
+              <h3 className="text-md font-medium text-white">
                 {format(parseISO(day.date), 'EEEE, MMMM dd, yyyy')}
               </h3>
-              <div className="text-xs text-gray-400">
-                Total: {day.hours.reduce((sum, hour) => sum + hour.unitsProduced, 0)} units
-              </div>
             </div>
 
-            {/* Hour bars */}
-            <div className="grid grid-cols-24 gap-1">
-              {day.hours.map((hour) => (
-                <div
-                  key={hour.hour}
-                  className="flex flex-col items-center cursor-pointer group"
-                  onClick={() => setSelectedHour({ hour, date: day.date })}
-                >
+            {/* Compact timeline visualization */}
+            <div className="mb-3 relative h-8 bg-gray-800 rounded overflow-hidden">
+              {/* Hour state indicators */}
+              <div className="absolute inset-0 flex">
+                {day.hours.map((hour) => (
                   <div
-                    className={`w-full rounded transition-all duration-200 group-hover:opacity-80 ${getHourColor(hour)}`}
-                    style={{ height: `${Math.max(8, (hour.unitsProduced / 100) * 40)}px` }}
-                    title={`${hour.hour}:00 - ${hour.unitsProduced} units`}
+                    key={hour.hour}
+                    className="flex-1 h-full cursor-pointer group relative"
+                    onClick={() => setSelectedHour({ hour, date: day.date })}
+                  >
+                    <div
+                      className={`w-full h-full transition-all duration-200 group-hover:opacity-80 ${getHourColor(hour)}`}
+                      title={`${hour.hour}:00 - ${hour.unitsProduced} units`}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              {/* Operator assignments overlay */}
+              {operatorSegments.map((segment, idx) => {
+                const operator = day.hours[segment.start].operator;
+                if (!operator) return null;
+                
+                return (
+                  <div
+                    key={`operator-${idx}`}
+                    className="absolute top-0 h-1/2 bg-blue-500 opacity-80"
+                    style={{
+                      left: `${(segment.start / 24) * 100}%`,
+                      width: `${((segment.end - segment.start + 1) / 24) * 100}%`,
+                    }}
+                    title={`Operator: ${operator.username} (${segment.end - segment.start + 1}h)`}
                   />
-                  <span className="text-xs text-gray-400 mt-1">
-                    {hour.hour}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
+              
+              {/* Mold assignments overlay */}
+              {moldSegments.map((segment, idx) => {
+                const mold = day.hours[segment.start].mold;
+                if (!mold) return null;
+                
+                return (
+                  <div
+                    key={`mold-${idx}`}
+                    className="absolute bottom-0 h-1/2 bg-purple-500 opacity-80"
+                    style={{
+                      left: `${(segment.start / 24) * 100}%`,
+                      width: `${((segment.end - segment.start + 1) / 24) * 100}%`,
+                    }}
+                    title={`Mold: ${mold.name} (${segment.end - segment.start + 1}h)`}
+                  />
+                );
+              })}
             </div>
 
-            {/* Operator and Mold info */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* Summary information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="flex items-center space-x-2">
                 <User className="h-4 w-4 text-blue-400" />
                 <span className="text-gray-400">Operator:</span>
@@ -284,33 +361,26 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({ data }) => {
                   {day.hours.find(h => h.mold)?.mold?.name || 'Not assigned'}
                 </span>
               </div>
+              
+              {/* Stoppages summary */}
+              {day.hours.some(h => h.stoppages.length > 0) && (
+                <div className="md:col-span-2 flex items-start space-x-2 text-red-400">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span>Stoppages: </span>
+                    {day.hours.flatMap(h => h.stoppages).map((stoppage, i) => (
+                      <span key={i} className="ml-1">
+                        {stoppage.reason.replace('_', ' ')} ({stoppage.duration}min)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
 
-      {/* Legend */}
-      <div className="bg-gray-700 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-white mb-3">Legend</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-green-500 rounded"></div>
-            <span className="text-gray-300">Production Running</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-            <span className="text-gray-300">Running (Low Output)</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-red-500 rounded"></div>
-            <span className="text-gray-300">Stoppage/Issue</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-gray-600 rounded"></div>
-            <span className="text-gray-300">No Production</span>
-          </div>
-        </div>
-      </div>
 
       {/* Stoppage Modal */}
       {selectedHour && (
@@ -320,7 +390,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({ data }) => {
           hour={selectedHour.hour}
           date={selectedHour.date}
           onAddStoppage={handleAddStoppage}
-          onUpdateStoppage={handleUpdateStoppage}
         />
       )}
     </div>
