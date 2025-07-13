@@ -5,6 +5,7 @@ import apiService from '../services/api';
 import ProductionTimeline from './ProductionTimeline';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import apiService from '../services/api';
 
 import {
   ArrowLeft,
@@ -35,10 +36,13 @@ const MachineView: React.FC = () => {
     name: '',
     description: ''
   });
+  const [availableOperators, setAvailableOperators] = useState<any[]>([]);
+  const [availableMolds, setAvailableMolds] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) {
       fetchMachineData();
+      fetchOperatorsAndMolds();
     }
   }, [id, selectedPeriod]);
 
@@ -63,6 +67,43 @@ const MachineView: React.FC = () => {
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOperatorsAndMolds = async () => {
+    try {
+      const [operators, molds] = await Promise.all([
+        apiService.getUsers(),
+        apiService.getMolds()
+      ]);
+      setAvailableOperators(operators.filter((u: any) => u.role === 'operator'));
+      setAvailableMolds(molds);
+    } catch (err) {
+      console.error('Failed to fetch operators and molds:', err);
+    }
+  };
+
+  const handleAddStoppage = async (stoppage: any) => {
+    try {
+      await apiService.addStoppageRecord({
+        ...stoppage,
+        machineId: id
+      });
+      toast.success('Stoppage recorded successfully');
+      fetchMachineData(); // Refresh timeline data
+    } catch (err) {
+      toast.error('Failed to record stoppage');
+    }
+  };
+
+  const handleUpdateProduction = async (machineId: string, hour: number, date: string, data: any) => {
+    try {
+      // This would need a new API endpoint to update production assignments
+      console.log('Update production:', { machineId, hour, date, data });
+      toast.success('Production data updated');
+      fetchMachineData(); // Refresh timeline data
+    } catch (err) {
+      toast.error('Failed to update production data');
     }
   };
 
@@ -366,8 +407,12 @@ const MachineView: React.FC = () => {
           </p>
         </div>
         <div className="p-6">
-          {/* <ProductionTimeline data={timeline} />  */} {/* Uncomment this line */}
-          <ProductionTimelineWithSampleData/>  {/* Comment this line */}
+          <ProductionTimeline 
+            data={timeline} 
+            machineId={id!}
+            onAddStoppage={handleAddStoppage}
+            onUpdateProduction={handleUpdateProduction}
+          />
         </div>
       </div>
     </div>
