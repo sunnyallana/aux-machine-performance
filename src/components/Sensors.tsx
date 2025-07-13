@@ -14,12 +14,11 @@ import {
   RotateCcw,
   Save,
   X,
-  AlertTriangle,
-  CheckCircle,
   Search,
   Building2
 } from 'lucide-react';
-
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface SensorFormData {
   name: string;
@@ -35,8 +34,6 @@ const Sensors: React.FC = () => {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingSensor, setEditingSensor] = useState<Sensor | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -63,6 +60,7 @@ const Sensors: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       const [sensorsData, departmentsData, machinesData] = await Promise.all([
         apiService.getSensorsForAdmin(),
         apiService.getDepartments(),
@@ -72,17 +70,34 @@ const Sensors: React.FC = () => {
       setDepartments(departmentsData);
       setMachines(machinesData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      const message = err instanceof Error ? err.message : 'Failed to fetch data';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-    };
+  // Add this function to refresh data without affecting loading state
+  const refreshData = async () => {
+    try {
+      const [sensorsData, departmentsData, machinesData] = await Promise.all([
+        apiService.getSensorsForAdmin(),
+        apiService.getDepartments(),
+        apiService.getMachines()
+      ]);
+      setSensors(sensorsData);
+      setDepartments(departmentsData);
+      setMachines(machinesData);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to refresh data';
+      toast.error(message);
+    }
+  };
 
-  // Filter sensors based on search term
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
   const filteredSensors = sensors.filter(sensor => {
     const lowerSearch = searchTerm.toLowerCase();
     const machine = (sensor.machineId as Machine);
@@ -102,28 +117,38 @@ const Sensors: React.FC = () => {
       const machinesData = await apiService.getMachinesByDepartment(departmentId);
       setMachines(machinesData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch machines');
+      const message = err instanceof Error ? err.message : 'Failed to fetch machines';
+      toast.error(message);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
+    
     try {
       if (editingSensor) {
         await apiService.updateSensor(editingSensor._id, formData);
-        setSuccess('Sensor updated successfully');
+        toast.success('Sensor updated successfully');
       } else {
         await apiService.createSensor(formData);
-        setSuccess('Sensor created successfully');
+        toast.success('Sensor created successfully');
       }
       
       resetForm();
-      fetchData();
+      // Refresh data to get populated information
+      refreshData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save sensor');
+      let message = 'Failed to save sensor';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('E11000 duplicate key error')) {
+          message = 'Sensor name must be unique';
+        } else {
+          message = err.message;
+        }
+      }
+      
+      toast.error(message);
     }
   };
 
@@ -149,10 +174,12 @@ const Sensors: React.FC = () => {
 
     try {
       await apiService.deleteSensor(sensorId);
-      setSuccess('Sensor deleted successfully');
-      fetchData();
+      // Refresh data instead of local state update
+      refreshData();
+      toast.success('Sensor deleted successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete sensor');
+      const message = err instanceof Error ? err.message : 'Failed to delete sensor';
+      toast.error(message);
     }
   };
 
@@ -195,7 +222,11 @@ const Sensors: React.FC = () => {
     return (
       <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
         <div className="flex items-center">
-          <AlertTriangle className="h-4 w-4 mr-2" />
+          <div className="h-4 w-4 mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+            </svg>
+          </div>
           <span>Access denied. Admin privileges required.</span>
         </div>
       </div>
@@ -212,6 +243,19 @@ const Sensors: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+      
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
@@ -245,26 +289,6 @@ const Sensors: React.FC = () => {
           </button>
         </div>
       </div>
-
-
-      {/* Status Messages */}
-      {error && (
-        <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
-          <div className="flex items-center">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            <span>{error}</span>
-          </div>
-        </div>
-      )}
-
-      {success && (
-        <div className="bg-green-900/50 border border-green-500 text-green-300 px-4 py-3 rounded-md">
-          <div className="flex items-center">
-            <CheckCircle className="h-4 w-4 mr-2" />
-            <span>{success}</span>
-          </div>
-        </div>
-      )}
 
       {/* Sensor Form Modal */}
       {showForm && (

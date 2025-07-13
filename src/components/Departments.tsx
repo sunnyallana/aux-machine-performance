@@ -12,16 +12,16 @@ import {
   Power, 
   PowerOff,
   Search,
-  AlertTriangle,
   Loader
 } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Departments: React.FC = () => {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
@@ -47,9 +47,9 @@ const Departments: React.FC = () => {
       } else {
         setDepartments(data);
       }
-      setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch departments');
+      const message = err instanceof Error ? err.message : 'Failed to fetch departments';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -71,8 +71,10 @@ const Departments: React.FC = () => {
       setDepartments([...departments, newDepartment]);
       setFormData({ name: '', description: '' });
       setIsCreating(false);
+      toast.success('Department created successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create department');
+      const message = err instanceof Error ? err.message : 'Failed to create department';
+      toast.error(message);
     }
   };
 
@@ -86,8 +88,10 @@ const Departments: React.FC = () => {
         dept._id === editingDepartment._id ? updatedDepartment : dept
       ));
       setEditingDepartment(null);
+      toast.success('Department updated successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update department');
+      const message = err instanceof Error ? err.message : 'Failed to update department';
+      toast.error(message);
     }
   };
 
@@ -98,8 +102,10 @@ const Departments: React.FC = () => {
       setDepartments(departments.map(dept => 
         dept._id === id ? updatedDepartment : dept
       ));
+      toast.success(`Department ${!isActive ? 'activated' : 'deactivated'} successfully`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update department status');
+      const message = err instanceof Error ? err.message : 'Failed to update department status';
+      toast.error(message);
     } finally {
       setStatusTogglingId(null);
     }
@@ -111,8 +117,10 @@ const Departments: React.FC = () => {
         setDeletingId(id);
         await apiService.deleteDepartment(id);
         setDepartments(departments.filter(dept => dept._id !== id));
+        toast.success('Department deleted successfully');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete department');
+        const message = err instanceof Error ? err.message : 'Failed to delete department';
+        toast.error(message);
       } finally {
         setDeletingId(null);
       }
@@ -132,19 +140,21 @@ const Departments: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
-        <div className="flex items-center">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <span>{error}</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+      
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
