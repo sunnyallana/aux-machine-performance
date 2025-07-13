@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Machine, ProductionTimelineDay, MachineStats } from '../types';
 import apiService from '../services/api';
 import ProductionTimeline from './ProductionTimeline';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import {
   ArrowLeft,
@@ -20,7 +22,6 @@ import {
 
 import ProductionTimelineWithSampleData from './ProductionTimeline';
 
-
 const MachineView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -28,7 +29,6 @@ const MachineView: React.FC = () => {
   const [timeline, setTimeline] = useState<ProductionTimelineDay[]>([]);
   const [stats, setStats] = useState<MachineStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('24h');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -59,7 +59,8 @@ const MachineView: React.FC = () => {
       setTimeline(timelineData);
       setStats(statsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch machine data');
+      const message = err instanceof Error ? err.message : 'Failed to fetch machine data';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -77,8 +78,9 @@ const MachineView: React.FC = () => {
       const updatedMachine = await apiService.updateMachine(id, editForm);
       setMachine(updatedMachine);
       setIsEditing(false);
+      toast.success('Machine details updated');
     } catch (err) {
-      setError('Failed to update machine');
+      toast.error('Failed to update machine');
     }
   };
 
@@ -110,17 +112,6 @@ const MachineView: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
-        <div className="flex items-center">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <span>{error}</span>
-        </div>
-      </div>
-    );
-  }
-
   if (!machine || !stats) {
     return (
       <div className="text-center py-12">
@@ -131,6 +122,19 @@ const MachineView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">

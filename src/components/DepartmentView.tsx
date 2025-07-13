@@ -7,15 +7,17 @@ import {
   ArrowLeft,
   Settings,
   Activity,
-  AlertTriangle,
   Plus,
   Edit,
   Power,
   Gauge,
   Trash2,
   Save,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const DepartmentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +26,6 @@ const DepartmentView: React.FC = () => {
   const [department, setDepartment] = useState<Department | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [isAddingMachine, setIsAddingMachine] = useState(false);
   const [newMachine, setNewMachine] = useState<{
   name: string;
@@ -64,7 +65,8 @@ const DepartmentView: React.FC = () => {
 
     setPositions(initialPositions);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch department data');
+      const message = err instanceof Error ? err.message : 'Failed to fetch department data';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -114,8 +116,10 @@ const DepartmentView: React.FC = () => {
         description: '',
         status: 'stopped'
       });
+      toast.success('Machine added successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add machine');
+      const message = err instanceof Error ? err.message : 'Failed to add machine';
+      toast.error(message);
     }
   };
 
@@ -130,8 +134,10 @@ const DepartmentView: React.FC = () => {
         if (draggingMachineId === machineId) {
           setDraggingMachineId(null);
         }
+        toast.success('Machine deleted successfully');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete machine');
+        const message = err instanceof Error ? err.message : 'Failed to delete machine';
+        toast.error(message);
       }
     }
   };
@@ -186,8 +192,10 @@ const DepartmentView: React.FC = () => {
         draggingMachineId, 
         positions[draggingMachineId]
       );
+      toast.success('Machine position updated');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update machine position');
+      const message = err instanceof Error ? err.message : 'Failed to update machine position';
+      toast.error(message);
     } finally {
       setDraggingMachineId(null);
     }
@@ -210,8 +218,10 @@ const DepartmentView: React.FC = () => {
         )
       );
       setEditLayoutMode(false);
+      toast.success('Layout saved successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save layout');
+      const message = err instanceof Error ? err.message : 'Failed to save layout';
+      toast.error(message);
     }
   };
 
@@ -219,17 +229,6 @@ const DepartmentView: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
-        <div className="flex items-center">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <span>{error}</span>
-        </div>
       </div>
     );
   }
@@ -244,6 +243,19 @@ const DepartmentView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
