@@ -15,6 +15,8 @@ import {
   Loader,
   Building2
 } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Users: React.FC = () => {
   const { isAdmin } = useAuth();
@@ -22,7 +24,6 @@ const Users: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
@@ -50,9 +51,9 @@ const Users: React.FC = () => {
       ]);
       setUsers(usersData);
       setDepartments(departmentsData);
-      setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      const message = err instanceof Error ? err.message : 'Failed to fetch data';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -84,7 +85,6 @@ const Users: React.FC = () => {
     }
   };
 
-  // Clear department when switching to admin role
   useEffect(() => {
     if (!isCreating) return;
     if (formData.role !== 'operator') {
@@ -112,8 +112,23 @@ const Users: React.FC = () => {
         isActive: true
       });
       setIsCreating(false);
+      toast.success("User created successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create user');
+      let message = 'Failed to create user';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('E11000 duplicate key error')) {
+          if (err.message.includes('username')) {
+            message = 'Username already exists';
+          } else if (err.message.includes('email')) {
+            message = 'Email already exists';
+          }
+        } else {
+          message = err.message;
+        }
+      }
+      
+      toast.error(message);
     }
   };
 
@@ -141,8 +156,23 @@ const Users: React.FC = () => {
         user._id === editingUser._id ? updatedUser : user
       ));
       setEditingUser(null);
+      toast.success("User updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user');
+      let message = 'Failed to update user';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('E11000 duplicate key error')) {
+          if (err.message.includes('username')) {
+            message = 'Username already exists';
+          } else if (err.message.includes('email')) {
+            message = 'Email already exists';
+          }
+        } else {
+          message = err.message;
+        }
+      }
+      
+      toast.error(message);
     }
   };
 
@@ -153,8 +183,10 @@ const Users: React.FC = () => {
       setUsers(users.map(user => 
         user._id === id ? updatedUser : user
       ));
+      toast.success(`User ${!isActive ? 'activated' : 'deactivated'} successfully`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user status');
+      const message = err instanceof Error ? err.message : 'Failed to update user status';
+      toast.error(message);
     } finally {
       setStatusTogglingId(null);
     }
@@ -166,8 +198,10 @@ const Users: React.FC = () => {
         setDeletingId(id);
         await apiService.deleteUser(id);
         setUsers(users.filter(user => user._id !== id));
+        toast.success("User deleted successfully");
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete user');
+        const message = err instanceof Error ? err.message : 'Failed to delete user';
+        toast.error(message);
       } finally {
         setDeletingId(null);
       }
@@ -179,16 +213,13 @@ const Users: React.FC = () => {
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Updated department name handling
   const getDepartmentName = (deptData: any) => {
     if (!deptData) return 'N/A';
     
-    // Handle populated department object
     if (typeof deptData === 'object' && deptData.name) {
       return deptData.name;
     }
     
-    // Handle string ID
     const department = departments.find(d => d._id === deptData);
     return department ? department.name : 'N/A';
   };
@@ -201,21 +232,22 @@ const Users: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
-        <div className="flex items-center">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <span>{error}</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+      
       {/* Header */}
-
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <UsersIcon className="h-8 w-8 text-blue-400" />

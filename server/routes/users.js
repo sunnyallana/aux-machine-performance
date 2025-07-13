@@ -5,17 +5,19 @@ const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+
 // Get all users (Admin only)
 router.get('/', auth, adminAuth, async (req, res) => {
   try {
     const users = await User.find({})
-      .populate('departmentId', 'name _id') // Only get name and ID
+      .populate('departmentId', 'name _id')
       .select('-password');
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 // Create user (Admin only)
 router.post('/', auth, adminAuth, async (req, res) => {
@@ -42,7 +44,17 @@ router.post('/', auth, adminAuth, async (req, res) => {
     
     res.status(201).json(userWithoutPassword);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    let message = 'Server error';
+    
+    if (error.code === 11000) {
+      if (error.keyPattern.username) {
+        message = 'Username already exists';
+      } else if (error.keyPattern.email) {
+        message = 'Email already exists';
+      }
+    }
+    
+    res.status(500).json({ message, error: error.message });
   }
 });
 
@@ -60,7 +72,7 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true }
+      { new: true, runValidators: true }
     )
     .populate('departmentId', 'name _id')
     .select('-password');
@@ -70,9 +82,20 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
     }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    let message = 'Server error';
+    
+    if (error.code === 11000) {
+      if (error.keyPattern.username) {
+        message = 'Username already exists';
+      } else if (error.keyPattern.email) {
+        message = 'Email already exists';
+      }
+    }
+    
+    res.status(500).json({ message, error: error.message });
   }
 });
+
 
 // Delete user (Admin only)
 router.delete('/:id', auth, adminAuth, async (req, res) => {
