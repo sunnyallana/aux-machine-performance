@@ -23,6 +23,7 @@ const Configuration: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('plc');
+  const [emailRecipients, setEmailRecipients] = useState('');
 
   // Pin mapping state
   const [selectedSensor, setSelectedSensor] = useState('');
@@ -33,6 +34,13 @@ const Configuration: React.FC = () => {
       fetchConfigData();
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (config) {
+      // Initialize recipients as comma-separated string
+      setEmailRecipients(config.email.recipients.join(', '));
+    }
+  }, [config]);
 
   const fetchConfigData = async () => {
     try {
@@ -321,25 +329,32 @@ const Configuration: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Recipients (comma-separated)
                 </label>
-                <textarea
-                  value={config.email.recipients.join(', ')}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    email: { 
-                      ...config.email, 
-                      recipients: e.target.value.split(',').map(email => email.trim()).filter(Boolean)
-                    }
-                  })}
-                  rows={3}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="manager@company.com, operator@company.com"
-                />
+                  <textarea
+                    value={emailRecipients}
+                    onChange={(e) => setEmailRecipients(e.target.value)}
+                    rows={3}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="manager@company.com, operator@company.com"
+                  />
               </div>
             </div>
 
             <div className="mt-6">
               <button
-                onClick={() => handleConfigUpdate({ email: config.email })}
+                onClick={() => {
+                  // Split into array only when saving
+                  const recipientsArray = emailRecipients
+                    .split(',')
+                    .map(email => email.trim())
+                    .filter(Boolean);
+                  
+                  handleConfigUpdate({
+                    email: {
+                      ...config.email,
+                      recipients: recipientsArray
+                    }
+                  });
+                }}
                 disabled={saving}
                 className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
