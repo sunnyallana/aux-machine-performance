@@ -7,14 +7,13 @@ import {
   Network,
   Mail,
   Save,
-  AlertTriangle,
-  CheckCircle,
   Cpu,
   Link,
   Plus,
-  X,
   Trash2
 } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Configuration: React.FC = () => {
   const { isAdmin } = useAuth();
@@ -23,8 +22,6 @@ const Configuration: React.FC = () => {
   const [pinMappings, setPinMappings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState('plc');
 
   // Pin mapping state
@@ -49,7 +46,12 @@ const Configuration: React.FC = () => {
       setSensors(sensorsData);
       setPinMappings(pinMappingsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch configuration');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch configuration';
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        theme: "dark"
+      });
     } finally {
       setLoading(false);
     }
@@ -57,16 +59,23 @@ const Configuration: React.FC = () => {
 
   const handleConfigUpdate = async (updatedConfig: Partial<Config>) => {
     setSaving(true);
-    setError('');
-    setSuccess('');
 
     try {
       const newConfig = { ...config, ...updatedConfig } as Config;
       await apiService.updateConfig(newConfig);
       setConfig(newConfig);
-      setSuccess('Configuration updated successfully');
+      toast.success('Configuration updated successfully', {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "dark"
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update configuration');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update configuration';
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        theme: "dark"
+      });
     } finally {
       setSaving(false);
     }
@@ -76,10 +85,19 @@ const Configuration: React.FC = () => {
     if (confirm('Are you sure you want to permanently delete this pin mapping?')) {
       try {
         await apiService.deletePinMapping(mappingId);
-        setSuccess('Pin mapping deleted successfully');
+        toast.success('Pin mapping deleted successfully', {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "dark"
+        });
         fetchConfigData(); // Refresh data
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete pin mapping');
+        const errorMessage = err instanceof Error ? err.message : 'Failed to delete pin mapping';
+        toast.error(errorMessage, {
+          position: "top-right",
+          autoClose: 5000,
+          theme: "dark"
+        });
       }
     }
   };
@@ -93,12 +111,22 @@ const Configuration: React.FC = () => {
         pinId: selectedPin
       });
       
-      setSuccess('Pin mapping created successfully');
+      toast.success('Pin mapping created successfully', {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "dark"
+      });
+      
       setSelectedSensor('');
       setSelectedPin('');
       fetchConfigData(); // Refresh data
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create pin mapping');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create pin mapping';
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        theme: "dark"
+      });
     }
   };
 
@@ -110,7 +138,6 @@ const Configuration: React.FC = () => {
     return (
       <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
         <div className="flex items-center">
-          <AlertTriangle className="h-4 w-4 mr-2" />
           <span>Access denied. Admin privileges required.</span>
         </div>
       </div>
@@ -127,6 +154,20 @@ const Configuration: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+      
       {/* Header */}
       <div className="flex items-center space-x-4">
         <Settings className="h-8 w-8 text-blue-400" />
@@ -135,25 +176,6 @@ const Configuration: React.FC = () => {
           <p className="text-gray-400">Configure PLC settings, email alerts, and sensor mappings</p>
         </div>
       </div>
-
-      {/* Status Messages */}
-      {error && (
-        <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
-          <div className="flex items-center">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            <span>{error}</span>
-          </div>
-        </div>
-      )}
-
-      {success && (
-        <div className="bg-green-900/50 border border-green-500 text-green-300 px-4 py-3 rounded-md">
-          <div className="flex items-center">
-            <CheckCircle className="h-4 w-4 mr-2" />
-            <span>{success}</span>
-          </div>
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-700">
@@ -423,7 +445,6 @@ const Configuration: React.FC = () => {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Link className="h-12 w-12 text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400">No pin mappings configured</p>
                   <p className="text-gray-500 text-sm mt-1">Create your first mapping above</p>
                 </div>

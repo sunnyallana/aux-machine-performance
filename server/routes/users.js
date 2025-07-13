@@ -61,26 +61,42 @@ router.post('/', auth, adminAuth, async (req, res) => {
 // Update user (Admin only)
 router.put('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const { role, departmentId } = req.body;
+    const { role, departmentId, password, ...updateData } = req.body;
     
     // Prepare update data
-    const updateData = {
-      ...req.body,
+    const userData = {
+      ...updateData,
+      role,
       departmentId: role === 'operator' ? departmentId : undefined
     };
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    )
-    .populate('departmentId', 'name _id')
-    .select('-password');
-    
+    // Find user and update
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+
+    // Update fields
+    user.username = userData.username;
+    user.email = userData.email;
+    user.role = userData.role;
+    user.departmentId = userData.departmentId;
+    user.isActive = userData.isActive;
+
+    // Only update password if provided
+    if (password && password.trim() !== '') {
+      user.password = password;
+    }
+
+    // Save will trigger password hashing
+    const updatedUser = await user.save();
+    
+    // Return user without password
+    const userWithoutPassword = updatedUser.toObject();
+    delete userWithoutPassword.password;
+    res.json(userWithoutPassword);
+
+    
   } catch (error) {
     let message = 'Server error';
     

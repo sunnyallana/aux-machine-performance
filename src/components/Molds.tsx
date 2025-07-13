@@ -51,9 +51,9 @@ const Molds: React.FC = () => {
       ]);
       
       // Enrich molds with department names
-      const enrichedMolds = moldsData.map(mold => {
+      const enrichedMolds = moldsData.map((mold: Mold) => {
         if (typeof mold.departmentId === 'string') {
-          const department = departmentsData.find(d => d._id === mold.departmentId);
+          const department = departmentsData.find((d: Department) => d._id === mold.departmentId);
           return {
             ...mold,
             departmentId: department 
@@ -63,6 +63,7 @@ const Molds: React.FC = () => {
         }
         return mold;
       });
+
       
       setMolds(enrichedMolds);
       setDepartments(departmentsData);

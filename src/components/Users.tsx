@@ -13,7 +13,9 @@ import {
   Search,
   AlertTriangle,
   Loader,
-  Building2
+  Building2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -37,6 +39,8 @@ const Users: React.FC = () => {
   });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusTogglingId, setStatusTogglingId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -143,6 +147,11 @@ const Users: React.FC = () => {
         role: editingUser.role,
         isActive: editingUser.isActive
       };
+
+      // Add password if provided
+      if (editingUser.password && editingUser.password.trim() !== '') {
+        updateData.password = editingUser.password;
+      }
 
       if (editingUser.role === 'operator') {
         updateData.departmentId = editingUser.departmentId;
@@ -371,15 +380,28 @@ const Users: React.FC = () => {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
                   Password *
                 </label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    name="password"
+                    required
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
               </div>
               
               <div>
@@ -485,6 +507,38 @@ const Users: React.FC = () => {
                   value={editingUser.email}
                   onChange={handleInputChange}
                 />
+              </div>
+              
+              {/* Password field for editing */}
+              <div>
+                <label htmlFor="edit-password" className="block text-sm font-medium text-gray-300 mb-1">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? "text" : "password"}
+                    id="edit-password"
+                    name="password"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={editingUser.password || ''}
+                    onChange={handleInputChange}
+                    placeholder="Leave blank to keep current password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                  >
+                    {showEditPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Only enter a value if you want to change the password
+                </p>
               </div>
               
               <div>
@@ -647,7 +701,8 @@ const Users: React.FC = () => {
                                   ? (typeof user.departmentId === 'object' 
                                       ? user.departmentId._id 
                                       : user.departmentId)
-                                  : ''
+                                  : '',
+                                password: '' // Initialize password field
                               });
                             }}
                             className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
