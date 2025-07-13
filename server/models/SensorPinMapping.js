@@ -9,15 +9,17 @@ const sensorPinMappingSchema = new mongoose.Schema({
   pinId: {
     type: String,
     required: true
-  },
-  isActive: {
-    type: Boolean,
-    default: true
   }
 }, {
   timestamps: true
 });
 
-sensorPinMappingSchema.index({ pinId: 1 }, { unique: true });
+// Only enforce unique pinId for active mappings
+sensorPinMappingSchema.index(
+  { pinId: 1 }, 
+  { 
+    unique: true, 
+  }
+);
 
 module.exports = mongoose.model('SensorPinMapping', sensorPinMappingSchema);

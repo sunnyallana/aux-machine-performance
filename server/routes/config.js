@@ -10,10 +10,10 @@ router.get('/', auth, adminAuth, async (req, res) => {
     let config = await Config.findOne();
     if (!config) {
       config = new Config({
-        plc: { ip: '192.168.1.100', rack: 0, slot: 1 },
+        plc: { ip: '192.168.1.11', rack: 0, slot: 1 },
         email: { 
-          senderEmail: '', 
-          senderPassword: '', 
+          senderEmail: 'admin@dawlance.com',
+          senderPassword: 'admin123',
           recipients: [] 
         }
       });
@@ -21,6 +21,7 @@ router.get('/', auth, adminAuth, async (req, res) => {
     }
     res.json(config);
   } catch (error) {
+    console.error('Config fetch error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -37,6 +38,7 @@ router.put('/', auth, adminAuth, async (req, res) => {
     await config.save();
     res.json(config);
   } catch (error) {
+    console.error('Config update error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

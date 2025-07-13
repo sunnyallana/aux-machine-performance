@@ -209,18 +209,7 @@ class ApiService {
     });
   }
 
-  async createPinMapping(mapping: any) {
-    return this.request('/sensors/pin-mapping', {
-      method: 'POST',
-      body: JSON.stringify(mapping),
-    });
-  }
-
-  async getPinMappings() {
-    return this.request('/sensors/pin-mappings');
-  }
-
-  async updateSensor(id: string, sensorData: any) {
+    async updateSensor(id: string, sensorData: any) {
   return this.request(`/sensors/${id}`, {
     method: 'PUT',
     body: JSON.stringify(sensorData),
@@ -232,7 +221,23 @@ class ApiService {
       method: 'DELETE',
     });
   }
+    // Pin mapping
+  async deletePinMapping(id: string) {
+    return this.request(`/sensors/pin-mapping/${id}`, {
+      method: 'DELETE',
+    });
+  }
 
+   async createPinMapping(mapping: any) {
+    return this.request('/sensors/pin-mapping', {
+      method: 'POST',
+      body: JSON.stringify(mapping),
+    });
+  }
+
+  async getPinMappings() {
+    return this.request('/sensors/pin-mappings');
+  }
 
     // Molds
   async getMolds() {
