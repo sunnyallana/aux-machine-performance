@@ -61,41 +61,38 @@ router.post('/', auth, adminAuth, async (req, res) => {
 // Update user (Admin only)
 router.put('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const { role, departmentId, password, ...updateData } = req.body;
+    const { password, ...updateData } = req.body;
     
-    // Prepare update data
-    const userData = {
-      ...updateData,
-      role,
-      departmentId: role === 'operator' ? departmentId : undefined
-    };
-
     // Find user and update
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update fields
-    user.username = userData.username;
-    user.email = userData.email;
-    user.role = userData.role;
-    user.departmentId = userData.departmentId;
-    user.isActive = userData.isActive;
+    // Update only provided fields
+    if (updateData.username !== undefined) user.username = updateData.username;
+    if (updateData.email !== undefined) user.email = updateData.email;
+    if (updateData.role !== undefined) {
+      user.role = updateData.role;
+      // Clear department for non-operators
+      if (updateData.role !== 'operator') {
+        user.departmentId = undefined;
+      }
+    }
+    if (updateData.departmentId !== undefined) user.departmentId = updateData.departmentId;
+    if (updateData.isActive !== undefined) user.isActive = updateData.isActive;
 
     // Only update password if provided
     if (password && password.trim() !== '') {
       user.password = password;
     }
 
-    // Save will trigger password hashing
     const updatedUser = await user.save();
     
     // Return user without password
     const userWithoutPassword = updatedUser.toObject();
     delete userWithoutPassword.password;
     res.json(userWithoutPassword);
-
     
   } catch (error) {
     let message = 'Server error';

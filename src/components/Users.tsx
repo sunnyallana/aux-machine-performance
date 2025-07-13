@@ -185,10 +185,13 @@ const Users: React.FC = () => {
     }
   };
 
+ 
   const handleToggleStatus = async (id: string, isActive: boolean) => {
     try {
       setStatusTogglingId(id);
-      const updatedUser = await apiService.updateUser(id, { isActive: !isActive });
+      const updatedUser = await apiService.updateUser(id, { 
+        isActive: !isActive 
+      });
       setUsers(users.map(user => 
         user._id === id ? updatedUser : user
       ));
