@@ -26,10 +26,14 @@ const DepartmentView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isAddingMachine, setIsAddingMachine] = useState(false);
-  const [newMachine, setNewMachine] = useState({
+  const [newMachine, setNewMachine] = useState<{
+  name: string;
+  description: string;
+  status: Machine['status'];
+  }>({
     name: '',
     description: '',
-    status: 'stopped' as 'running' | 'stopped' | 'maintenance' | 'error'
+    status: 'stopped'
   });
   const [editLayoutMode, setEditLayoutMode] = useState(false);
   const [positions, setPositions] = useState<{[key: string]: {x: number; y: number}}>({});
@@ -52,10 +56,13 @@ const DepartmentView: React.FC = () => {
       
       // Initialize positions
       const initialPositions: {[key: string]: {x: number; y: number}} = {};
-      deptData.machines?.forEach(machine => {
+      
+      // Add explicit type to machine parameter
+      deptData.machines?.forEach((machine: Machine) => {
         initialPositions[machine._id] = { ...machine.position };
       });
-      setPositions(initialPositions);
+
+    setPositions(initialPositions);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch department data');
     } finally {
@@ -69,7 +76,7 @@ const DepartmentView: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: Machine['status']) => {
     switch (status) {
       case 'running': return 'bg-green-500';
       case 'stopped': return 'bg-red-500';
@@ -79,7 +86,7 @@ const DepartmentView: React.FC = () => {
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: Machine['status']) => {
     switch (status) {
       case 'running': return 'Running';
       case 'stopped': return 'Stopped';
@@ -118,11 +125,17 @@ const DepartmentView: React.FC = () => {
       try {
         await apiService.deleteMachine(machineId);
         setMachines(machines.filter(m => m._id !== machineId));
+        
+        // Clear dragging state if deleting the dragged machine
+        if (draggingMachineId === machineId) {
+          setDraggingMachineId(null);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete machine');
       }
     }
   };
+
 
   const handleMouseDown = (machineId: string, e: React.MouseEvent) => {
     if (!editLayoutMode || !layoutContainerRef.current) return;
@@ -161,6 +174,12 @@ const DepartmentView: React.FC = () => {
   const handleMouseUp = async () => {
     if (!editLayoutMode || !draggingMachineId) return;
     
+    // Check if machine still exists
+    if (!machines.some(m => m._id === draggingMachineId)) {
+      setDraggingMachineId(null);
+      return;
+    }
+
     try {
       // Only save if position actually changed
       await apiService.updateMachinePosition(
@@ -176,9 +195,17 @@ const DepartmentView: React.FC = () => {
 
   const handleSaveLayout = async () => {
     try {
-      // Save all positions
+      // Filter out deleted machines
+      const validPositions = Object.keys(positions)
+        .filter(machineId => machines.some(m => m._id === machineId))
+        .reduce((acc, machineId) => {
+          acc[machineId] = positions[machineId];
+          return acc;
+        }, {} as {[key: string]: {x: number; y: number}});
+
+      // Save only positions for existing machines
       await Promise.all(
-        Object.entries(positions).map(([machineId, position]) => 
+        Object.entries(validPositions).map(([machineId, position]) => 
           apiService.updateMachinePosition(machineId, position)
         )
       );

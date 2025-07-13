@@ -147,9 +147,12 @@ const Departments: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Departments</h1>
-          <p className="text-gray-400">Manage and configure your industrial departments</p>
+        <div className="flex items-center space-x-4">
+          <Building2 className="h-8 w-8 text-blue-400" />
+          <div>
+            <h1 className="text-2xl font-bold text-white">Departments</h1>
+            <p className="text-gray-400">Manage and configure your industrial departments</p>
+          </div>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4">
