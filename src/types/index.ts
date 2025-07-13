@@ -68,7 +68,7 @@ export interface Mold {
   name: string;
   description?: string;
   productionCapacityPerHour: number;
-  departmentId: string;
+  departmentId: string | { _id: string; name: string };
   isActive: boolean;
 }
 

@@ -232,6 +232,42 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+
+    // Molds
+  async getMolds() {
+    return this.request('/molds');
+  }
+
+  async getAllMolds() {
+    return this.request('/molds/admin/all');
+  }
+
+  async createMold(mold: any) {
+    return this.request('/molds', {
+      method: 'POST',
+      body: JSON.stringify(mold),
+    });
+  }
+
+  async updateMold(id: string, moldData: any) {
+    return this.request(`/molds/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(moldData),
+    });
+  }
+
+  async deleteMold(id: string) {
+    return this.request(`/molds/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async toggleMoldStatus(id: string) {
+    return this.request(`/molds/${id}/status`, {
+      method: 'PATCH',
+    });
+  }
 }
 
 export default new ApiService();

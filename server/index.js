@@ -10,6 +10,7 @@ const signalRoutes = require('./routes/signals');
 const configRoutes = require('./routes/config');
 const analyticsRoutes = require('./routes/analytics');
 const userRoutes = require('./routes/users');
+const moldRoutes = require('./routes/molds.js');
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use('/api/signals', signalRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/molds', moldRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
