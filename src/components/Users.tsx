@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiService from '../services/api';
-import { 
-  User as UserIcon, 
+import {
+  Users as UsersIcon,
+  User as UserIcon,
   Plus, 
   Edit, 
   Trash2, 
@@ -214,10 +215,14 @@ const Users: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Users</h1>
-          <p className="text-gray-400">Manage system users and permissions</p>
+        <div className="flex items-center space-x-4">
+          <UsersIcon className="h-8 w-8 text-blue-400" />
+          <div>
+            <h1 className="text-2xl font-bold text-white">User Management</h1>
+            <p className="text-gray-400">Manage system users and their permissions</p>
+          </div>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4">

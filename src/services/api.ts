@@ -98,6 +98,10 @@ class ApiService {
     return this.request(`/machines/${id}`);
   }
 
+  async getMachines() {
+    return this.request('/machines');
+  }
+
   async createMachine(machine: any) {
     return this.request('/machines', {
       method: 'POST',
@@ -194,6 +198,10 @@ class ApiService {
     return this.request(`/sensors/machine/${machineId}`);
   }
 
+  async getSensorsForAdmin() {
+    return this.request('/sensors/admin/all');
+  }
+
   async createSensor(sensor: any) {
     return this.request('/sensors', {
       method: 'POST',
@@ -210,6 +218,19 @@ class ApiService {
 
   async getPinMappings() {
     return this.request('/sensors/pin-mappings');
+  }
+
+  async updateSensor(id: string, sensorData: any) {
+  return this.request(`/sensors/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(sensorData),
+  });
+}
+
+  async deleteSensor(id: string) {
+    return this.request(`/sensors/${id}`, {
+      method: 'DELETE',
+    });
   }
 }
 

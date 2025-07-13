@@ -46,6 +46,16 @@ router.get('/:id', auth, async (req, res) => {
   }
 });
 
+// Get all machines (Admin only)
+router.get('/', auth, adminAuth, async (req, res) => {
+  try {
+    const machines = await Machine.find({ isActive: true }).populate('departmentId');
+    res.json(machines);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Create machine (Admin only)
 router.post('/', auth, adminAuth, async (req, res) => {
   try {

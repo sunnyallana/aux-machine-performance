@@ -22,7 +22,7 @@ export interface Machine {
   _id: string;
   name: string;
   description?: string;
-  departmentId: string;
+  departmentId: string | Department;
   position: { x: number; y: number };
   status: 'running' | 'stopped' | 'maintenance' | 'error';
   isActive: boolean;
@@ -34,8 +34,8 @@ export interface Sensor {
   _id: string;
   name: string;
   description?: string;
-  machineId: string;
-  sensorType: 'power' | 'unit-cycle' | 'temperature' | 'pressure' | 'vibration';
+  machineId: string | Machine;
+  sensorType: 'power' | 'unit-cycle';
   isActive: boolean;
 }
 

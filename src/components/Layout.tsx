@@ -8,6 +8,7 @@ import {
   Building2, 
   User,
   Menu,
+  Activity,
   X
 } from 'lucide-react';
 import { useState } from 'react';
@@ -27,6 +28,7 @@ const Layout: React.FC = () => {
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     ...(isAdmin ? [
       { name: 'Users', href: '/users', icon: User },
+      { name: 'Sensors', href: '/sensors', icon: Activity },
       { name: 'Departments', href: '/departments', icon: Building2 },
       { name: 'Configuration', href: '/config', icon: Settings },
     ] : []),

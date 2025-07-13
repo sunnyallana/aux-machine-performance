@@ -19,7 +19,7 @@ const sensorSchema = new mongoose.Schema({
   },
   sensorType: {
     type: String,
-    enum: ['power', 'unit-cycle', 'temperature', 'pressure', 'vibration'],
+    enum: ['power', 'unit-cycle'],
     required: true
   },
   isActive: {

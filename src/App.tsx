@@ -8,6 +8,7 @@ import DepartmentView from './components/DepartmentView';
 import MachineView from './components/MachineView';
 import Departments from './components/Departments';
 import Users from './components/Users';
+import Sensors from './components/Sensors';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -36,6 +37,7 @@ const App: React.FC = () => {
             <Route path="department/:id" element={<DepartmentView />} />
             <Route path="machine/:id" element={<MachineView />} />
             <Route path="/users" element={<Users/>} />
+            <Route path="/sensors" element={<Sensors />} />
           </Route>
         </Routes>
       </Router>
