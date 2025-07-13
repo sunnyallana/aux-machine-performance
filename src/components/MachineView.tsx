@@ -5,7 +5,6 @@ import apiService from '../services/api';
 import ProductionTimeline from './ProductionTimeline';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import apiService from '../services/api';
 
 import {
   ArrowLeft,

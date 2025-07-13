@@ -287,7 +287,7 @@ const Configuration: React.FC = () => {
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
             <div className="flex items-center space-x-2 mb-4">
               <Mail className="h-5 w-5 text-blue-400" />
-              <h2 className="text-lg font-semibold text-white">Email Alert Settings</h2>
+              <h2 className="text-lg font-semibold text-white">Outlook Email Alert Settings</h2>
             </div>
             
             <div className="space-y-4">

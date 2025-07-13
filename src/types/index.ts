@@ -58,7 +58,6 @@ export interface StoppageRecord {
   id: string;
   reason: 'planned' | 'mold_change' | 'breakdown' | 'maintenance' | 'material_shortage' | 'other';
   description?: string;
-  duration?: number;
   startTime: string;
   endTime?: string;
   reportedBy?: User;
