@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProductionTimelineDay, ProductionHour, StoppageRecord, User, Mold } from '../types';
-import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { 
   Clock, 
   User as UserIcon, 
@@ -14,7 +14,9 @@ import {
   Package,
   TrendingUp,
   TrendingDown,
-  Activity
+  Activity,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface ProductionTimelineProps {
@@ -402,6 +404,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
 }) => {
   const [selectedHour, setSelectedHour] = useState<{ hour: ProductionHour; date: string } | null>(null);
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   const getHourColor = (hour: ProductionHour) => {
     if (hour.stoppages.length > 0) return 'bg-red-500';
@@ -434,15 +437,18 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
     );
   }
 
+  const currentDay = data[selectedDayIndex] || data[0];
+  const maxUnits = getMaxUnitsForDay(currentDay);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* View Mode Selector */}
       <div className="flex items-center justify-between">
         <div className="flex space-x-1">
           {[
-            { value: 'day', label: 'Day View' },
-            { value: 'week', label: 'Week View' },
-            { value: 'month', label: 'Month View' }
+            { value: 'day', label: 'Day' },
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' }
           ].map((mode) => (
             <button
               key={mode.value}
@@ -459,150 +465,212 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
         </div>
 
         {/* Legend */}
-        <div className="flex items-center space-x-4 text-xs">
+        <div className="flex items-center space-x-3 text-xs">
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <div className="w-2 h-2 bg-green-500 rounded"></div>
             <span className="text-gray-300">Production</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-            <span className="text-gray-300">Running (Low)</span>
+            <div className="w-2 h-2 bg-yellow-500 rounded"></div>
+            <span className="text-gray-300">Running</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-red-500 rounded"></div>
+            <div className="w-2 h-2 bg-red-500 rounded"></div>
             <span className="text-gray-300">Stoppage</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            <div className="w-2 h-2 bg-blue-500 rounded"></div>
             <span className="text-gray-300">Maintenance</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-purple-500 rounded"></div>
+            <div className="w-2 h-2 bg-purple-500 rounded"></div>
             <span className="text-gray-300">Mold Change</span>
           </div>
         </div>
       </div>
-      
-      {data.map((day) => {
-        const maxUnits = getMaxUnitsForDay(day);
-        
-        return (
-          <div key={day.date} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-            {/* Date header */}
-            <div className="bg-gray-750 px-6 py-4 border-b border-gray-700">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">
-                  {format(parseISO(day.date), 'EEEE, MMMM dd, yyyy')}
-                </h3>
-                <div className="text-sm text-gray-400">
-                  Total: {day.hours.reduce((sum, h) => sum + h.unitsProduced, 0)} units
-                </div>
-              </div>
-            </div>
 
-            {/* Timeline Grid */}
-            <div className="p-6">
-              <div className="grid grid-cols-24 gap-1 mb-4">
-                {day.hours.map((hour) => (
-                  <div
-                    key={hour.hour}
-                    className="relative group cursor-pointer"
-                    onClick={() => setSelectedHour({ hour, date: day.date })}
-                  >
-                    {/* Hour block */}
-                    <div
-                      className={`h-16 rounded-md transition-all duration-200 group-hover:scale-105 ${getHourColor(hour)}`}
-                      style={{ 
-                        opacity: getHourIntensity(hour, maxUnits),
-                        border: hour.stoppages.length > 0 ? '2px solid #ef4444' : 'none'
-                      }}
-                    />
-                    
-                    {/* Hour label */}
-                    <div className="absolute -bottom-6 left-0 right-0 text-center">
-                      <span className="text-xs text-gray-400">
-                        {formatTime(hour.hour)}
-                      </span>
-                    </div>
-
-                    {/* Units produced overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs font-medium text-white bg-black bg-opacity-50 px-1 rounded">
-                        {hour.unitsProduced}
-                      </span>
-                    </div>
-
-                    {/* Defects indicator */}
-                    {hour.defectiveUnits > 0 && (
-                      <div className="absolute top-1 right-1">
-                        <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                      </div>
-                    )}
-
-                    {/* Operator indicator */}
-                    {hour.operator && (
-                      <div className="absolute top-1 left-1">
-                        <UserIcon className="w-3 h-3 text-blue-400" />
-                      </div>
-                    )}
-
-                    {/* Mold indicator */}
-                    {hour.mold && (
-                      <div className="absolute bottom-1 left-1">
-                        <Wrench className="w-3 h-3 text-purple-400" />
-                      </div>
-                    )}
-
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap border border-gray-600">
-                        <div className="font-medium">{formatTime(hour.hour)} - {formatTime(hour.hour + 1)}</div>
-                        <div>Units: {hour.unitsProduced}</div>
-                        {hour.defectiveUnits > 0 && <div className="text-red-400">Defects: {hour.defectiveUnits}</div>}
-                        {hour.operator && <div className="text-blue-400">Op: {hour.operator.username}</div>}
-                        {hour.mold && <div className="text-purple-400">Mold: {hour.mold.name}</div>}
-                        {hour.stoppages.length > 0 && (
-                          <div className="text-red-400">
-                            Stoppages: {hour.stoppages.length}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Summary Row */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-gray-700">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-400">
-                    {day.hours.reduce((sum, h) => sum + h.unitsProduced, 0)}
-                  </div>
-                  <div className="text-sm text-gray-400">Total Units</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-400">
-                    {day.hours.reduce((sum, h) => sum + h.defectiveUnits, 0)}
-                  </div>
-                  <div className="text-sm text-gray-400">Total Defects</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-400">
-                    {day.hours.filter(h => h.status === 'running').length}h
-                  </div>
-                  <div className="text-sm text-gray-400">Running Time</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-400">
-                    {day.hours.reduce((sum, h) => sum + h.stoppages.length, 0)}
-                  </div>
-                  <div className="text-sm text-gray-400">Total Stoppages</div>
-                </div>
-              </div>
-            </div>
+      {/* Day Navigation */}
+      {data.length > 1 && (
+        <div className="flex items-center justify-between bg-gray-800 rounded-lg p-3 border border-gray-700">
+          <button
+            onClick={() => setSelectedDayIndex(Math.max(0, selectedDayIndex - 1))}
+            disabled={selectedDayIndex === 0}
+            className="p-1 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-white">
+              {format(parseISO(currentDay.date), 'EEEE, MMMM dd, yyyy')}
+            </h3>
+            <p className="text-sm text-gray-400">
+              Total: {currentDay.hours.reduce((sum, h) => sum + h.unitsProduced, 0)} units • 
+              Defects: {currentDay.hours.reduce((sum, h) => sum + h.defectiveUnits, 0)}
+            </p>
           </div>
-        );
-      })}
+          
+          <button
+            onClick={() => setSelectedDayIndex(Math.min(data.length - 1, selectedDayIndex + 1))}
+            disabled={selectedDayIndex === data.length - 1}
+            className="p-1 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
+      {/* Compact Horizontal Timeline */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        {/* Time Labels */}
+        <div className="flex mb-2 text-xs text-gray-400">
+          {currentDay.hours.map((hour) => (
+            <div key={hour.hour} className="flex-1 text-center min-w-0">
+              {formatTime(hour.hour)}
+            </div>
+          ))}
+        </div>
+
+        {/* Production Blocks */}
+        <div className="flex gap-1 mb-3">
+          {currentDay.hours.map((hour) => (
+            <div
+              key={hour.hour}
+              className="flex-1 relative group cursor-pointer min-w-0"
+              onClick={() => setSelectedHour({ hour, date: currentDay.date })}
+            >
+              {/* Main production block */}
+              <div
+                className={`h-12 rounded transition-all duration-200 group-hover:scale-105 border ${getHourColor(hour)}`}
+                style={{ 
+                  opacity: getHourIntensity(hour, maxUnits),
+                  borderColor: hour.stoppages.length > 0 ? '#ef4444' : 'transparent',
+                  borderWidth: hour.stoppages.length > 0 ? '2px' : '1px'
+                }}
+              >
+                {/* Units produced */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-bold text-white bg-black bg-opacity-60 px-1 rounded">
+                    {hour.unitsProduced}
+                  </span>
+                </div>
+
+                {/* Status indicators */}
+                <div className="absolute top-0 left-0 right-0 flex justify-between p-0.5">
+                  {/* Operator indicator */}
+                  {hour.operator && (
+                    <div className="w-2 h-2 bg-blue-400 rounded-full" title="Operator assigned" />
+                  )}
+                  
+                  {/* Defects indicator */}
+                  {hour.defectiveUnits > 0 && (
+                    <div className="w-2 h-2 bg-red-400 rounded-full" title={`${hour.defectiveUnits} defects`} />
+                  )}
+                </div>
+
+                {/* Bottom indicators */}
+                <div className="absolute bottom-0 left-0 right-0 flex justify-between p-0.5">
+                  {/* Mold indicator */}
+                  {hour.mold && (
+                    <div className="w-2 h-2 bg-purple-400 rounded-full" title="Mold assigned" />
+                  )}
+                  
+                  {/* Stoppage indicator */}
+                  {hour.stoppages.length > 0 && (
+                    <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" title={`${hour.stoppages.length} stoppages`} />
+                  )}
+                </div>
+              </div>
+
+              {/* Hover tooltip */}
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap border border-gray-600 shadow-lg">
+                  <div className="font-medium">{formatTime(hour.hour)}</div>
+                  <div>Units: <span className="text-green-400">{hour.unitsProduced}</span></div>
+                  {hour.defectiveUnits > 0 && (
+                    <div>Defects: <span className="text-red-400">{hour.defectiveUnits}</span></div>
+                  )}
+                  {hour.operator && (
+                    <div>Op: <span className="text-blue-400">{hour.operator.username}</span></div>
+                  )}
+                  {hour.mold && (
+                    <div>Mold: <span className="text-purple-400">{hour.mold.name}</span></div>
+                  )}
+                  <div>Status: <span className="capitalize">{hour.status.replace('_', ' ')}</span></div>
+                  {hour.stoppages.length > 0 && (
+                    <div className="text-red-400">
+                      {hour.stoppages.length} stoppage{hour.stoppages.length > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Summary Stats */}
+        <div className="grid grid-cols-4 gap-4 pt-3 border-t border-gray-700">
+          <div className="text-center">
+            <div className="text-lg font-bold text-green-400">
+              {currentDay.hours.reduce((sum, h) => sum + h.unitsProduced, 0)}
+            </div>
+            <div className="text-xs text-gray-400">Total Units</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-red-400">
+              {currentDay.hours.reduce((sum, h) => sum + h.defectiveUnits, 0)}
+            </div>
+            <div className="text-xs text-gray-400">Defects</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-yellow-400">
+              {currentDay.hours.filter(h => h.status === 'running').length}h
+            </div>
+            <div className="text-xs text-gray-400">Running</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-blue-400">
+              {currentDay.hours.reduce((sum, h) => sum + h.stoppages.length, 0)}
+            </div>
+            <div className="text-xs text-gray-400">Stoppages</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Week/Month Overview */}
+      {viewMode !== 'day' && data.length > 1 && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <h4 className="text-sm font-medium text-white mb-3">
+            {viewMode === 'week' ? 'Week' : 'Month'} Overview
+          </h4>
+          <div className="space-y-2">
+            {data.map((day, index) => (
+              <div 
+                key={day.date} 
+                className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                  index === selectedDayIndex ? 'bg-blue-600/20 border border-blue-500/30' : 'hover:bg-gray-700'
+                }`}
+                onClick={() => setSelectedDayIndex(index)}
+              >
+                <div className="text-sm text-white">
+                  {format(parseISO(day.date), 'MMM dd')}
+                </div>
+                <div className="flex items-center space-x-4 text-xs">
+                  <span className="text-green-400">
+                    {day.hours.reduce((sum, h) => sum + h.unitsProduced, 0)} units
+                  </span>
+                  <span className="text-red-400">
+                    {day.hours.reduce((sum, h) => sum + h.defectiveUnits, 0)} defects
+                  </span>
+                  <span className="text-yellow-400">
+                    {day.hours.filter(h => h.status === 'running').length}h running
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Production Modal */}
       {selectedHour && (
