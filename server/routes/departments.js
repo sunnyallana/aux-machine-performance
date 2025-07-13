@@ -1,6 +1,7 @@
 const express = require('express');
 const Department = require('../models/Department');
 const Machine = require('../models/Machine');
+const Molds = require('../models/Mold');
 const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -114,10 +115,13 @@ router.delete('/:id', auth, adminAuth, async (req, res) => {
     // Delete associated machines first
     await Machine.deleteMany({ departmentId: req.params.id });
 
+    // Delete associated molds first
+    await Molds.deleteMany({ departmentId: req.params.id });
+
     // Then delete department
     await Department.findByIdAndDelete(req.params.id);
 
-    res.json({ message: 'Department and associated machines deleted successfully' });
+    res.json({ message: 'Department, associated machines, and associated molds deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
