@@ -1,16 +1,15 @@
 {
-  "backend": {
-    "url": "http://localhost:3001/api",
-    "timeout": 5
+  "plc": {
+    "ip": "192.168.1.11",
+    "rack": 0,
+    "slot": 1
   },
-  "pins": {
-    "available": ["DQ.0", "DQ.1", "DQ.2", "DQ.3", "DQ.4", "DQ.5", "DQ.6", "DQ.7"],
-    "cycle_probability": 0.1,
-    "power_variation": 0.3
+  "mongodb": {
+    "connection_string": "mongodb://localhost:27017/industrial_iot"
   },
-  "timing": {
-    "interval_seconds": 2,
-    "cycle_duration_ms": 500
+  "sampling": {
+    "interval_seconds": 5,
+    "production_update_minutes": 60
   },
   "logging": {
     "level": "INFO"

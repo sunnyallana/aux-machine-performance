@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Machine = require('./Machine');
 
 const signalDataSchema = new mongoose.Schema({
   sensorId: {
@@ -19,19 +20,22 @@ const signalDataSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
     index: true
-  },
-  metadata: {
-    pin: String,
-    sensorType: String,
-    source: String
   }
 }, {
   timestamps: true
 });
 
-// Indexes for efficient querying
 signalDataSchema.index({ sensorId: 1, timestamp: -1 });
 signalDataSchema.index({ machineId: 1, timestamp: -1 });
-signalDataSchema.index({ timestamp: -1 });
+
+signalDataSchema.pre('save', async function(next) {
+  if (!mongoose.Types.ObjectId.isValid(this.machineId)) {
+    const machineExists = await Machine.exists({ _id: this.machineId });
+    if (!machineExists) {
+      throw new Error('Invalid machine reference');
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model('SignalData', signalDataSchema);
