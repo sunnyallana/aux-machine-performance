@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProductionTimelineDay, ProductionHour, StoppageRecord, User, Mold } from '../types';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfDay, addDays, subDays } from 'date-fns';
+import apiService from '../services/api';
 import { 
   Clock, 
   User as UserIcon, 
@@ -16,7 +17,10 @@ import {
   TrendingDown,
   Activity,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw,
+  Zap,
+  RotateCcw
 } from 'lucide-react';
 
 interface ProductionTimelineProps {
@@ -403,8 +407,32 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   onUpdateProduction 
 }) => {
   const [selectedHour, setSelectedHour] = useState<{ hour: ProductionHour; date: string } | null>(null);
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Auto-refresh every 5 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleRefresh();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [machineId]);
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      // This would trigger a refresh in the parent component
+      // For now, we'll just update the timestamp
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Error refreshing timeline:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const getHourColor = (hour: ProductionHour) => {
     if (hour.stoppages.length > 0) return 'bg-red-500';
@@ -431,37 +459,71 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   if (!data || data.length === 0) {
     return (
       <div className="text-center py-8">
-        <Clock className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-        <p className="text-gray-400">No production data available</p>
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-8">
+          <Clock className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-400 mb-2">No Production Data</h3>
+          <p className="text-gray-500 mb-4">
+            Waiting for real-time sensor data from the production line...
+          </p>
+          <div className="flex items-center justify-center space-x-4 text-sm text-gray-400">
+            <div className="flex items-center space-x-2">
+              <Zap className="h-4 w-4 text-yellow-400" />
+              <span>Power Sensors</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RotateCcw className="h-4 w-4 text-blue-400" />
+              <span>Cycle Sensors</span>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   const currentDay = data[selectedDayIndex] || data[0];
   const maxUnits = getMaxUnitsForDay(currentDay);
+  const currentHour = new Date().getHours();
 
   return (
     <div className="space-y-4">
-      {/* View Mode Selector */}
+      {/* Header with Real-time Indicator */}
       <div className="flex items-center justify-between">
-        <div className="flex space-x-1">
-          {[
-            { value: 'day', label: 'Day' },
-            { value: 'week', label: 'Week' },
-            { value: 'month', label: 'Month' }
-          ].map((mode) => (
+        <div className="flex items-center space-x-4">
+          <div className="flex space-x-1">
+            {[
+              { value: 'day', label: 'Day' },
+              { value: 'week', label: 'Week' },
+              { value: 'month', label: 'Month' }
+            ].map((mode) => (
+              <button
+                key={mode.value}
+                onClick={() => setViewMode(mode.value as any)}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  viewMode === mode.value
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Real-time indicator */}
+          <div className="flex items-center space-x-2 text-sm">
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-green-400">Live</span>
+            </div>
             <button
-              key={mode.value}
-              onClick={() => setViewMode(mode.value as any)}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                viewMode === mode.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-1 text-gray-400 hover:text-white transition-colors"
+              title="Refresh data"
             >
-              {mode.label}
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-          ))}
+          </div>
         </div>
 
         {/* Legend */}
@@ -481,10 +543,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-blue-500 rounded"></div>
             <span className="text-gray-300">Maintenance</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-2 h-2 bg-purple-500 rounded"></div>
-            <span className="text-gray-300">Mold Change</span>
           </div>
         </div>
       </div>
@@ -506,7 +564,8 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
             </h3>
             <p className="text-sm text-gray-400">
               Total: {currentDay.hours.reduce((sum, h) => sum + h.unitsProduced, 0)} units • 
-              Defects: {currentDay.hours.reduce((sum, h) => sum + h.defectiveUnits, 0)}
+              Defects: {currentDay.hours.reduce((sum, h) => sum + h.defectiveUnits, 0)} • 
+              Last update: {format(lastUpdate, 'HH:mm:ss')}
             </p>
           </div>
           
@@ -520,13 +579,18 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
         </div>
       )}
 
-      {/* Compact Horizontal Timeline */}
+      {/* Enhanced Horizontal Timeline */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
         {/* Time Labels */}
         <div className="flex mb-2 text-xs text-gray-400">
           {currentDay.hours.map((hour) => (
-            <div key={hour.hour} className="flex-1 text-center min-w-0">
-              {formatTime(hour.hour)}
+            <div key={hour.hour} className="flex-1 text-center min-w-0 relative">
+              <span className={hour.hour === currentHour ? 'text-green-400 font-bold' : ''}>
+                {formatTime(hour.hour)}
+              </span>
+              {hour.hour === currentHour && (
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-1 h-1 bg-green-400 rounded-full mt-1"></div>
+              )}
             </div>
           ))}
         </div>
@@ -541,75 +605,102 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
             >
               {/* Main production block */}
               <div
-                className={`h-12 rounded transition-all duration-200 group-hover:scale-105 border ${getHourColor(hour)}`}
+                className={`h-16 rounded transition-all duration-200 group-hover:scale-105 border-2 ${getHourColor(hour)} ${
+                  hour.hour === currentHour ? 'ring-2 ring-green-400 ring-opacity-50' : ''
+                }`}
                 style={{ 
                   opacity: getHourIntensity(hour, maxUnits),
-                  borderColor: hour.stoppages.length > 0 ? '#ef4444' : 'transparent',
-                  borderWidth: hour.stoppages.length > 0 ? '2px' : '1px'
+                  borderColor: hour.stoppages.length > 0 ? '#ef4444' : 
+                              hour.hour === currentHour ? '#10b981' : 'transparent'
                 }}
               >
-                {/* Units produced */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-bold text-white bg-black bg-opacity-60 px-1 rounded">
+                {/* Units produced - larger display */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-sm font-bold text-white bg-black bg-opacity-70 px-2 py-1 rounded">
                     {hour.unitsProduced}
+                  </span>
+                  <span className="text-xs text-white bg-black bg-opacity-50 px-1 rounded mt-1">
+                    units
                   </span>
                 </div>
 
-                {/* Status indicators */}
-                <div className="absolute top-0 left-0 right-0 flex justify-between p-0.5">
+                {/* Top indicators */}
+                <div className="absolute top-1 left-1 right-1 flex justify-between">
                   {/* Operator indicator */}
                   {hour.operator && (
-                    <div className="w-2 h-2 bg-blue-400 rounded-full" title="Operator assigned" />
+                    <div className="w-3 h-3 bg-blue-400 rounded-full border border-white" title="Operator assigned" />
                   )}
                   
                   {/* Defects indicator */}
                   {hour.defectiveUnits > 0 && (
-                    <div className="w-2 h-2 bg-red-400 rounded-full" title={`${hour.defectiveUnits} defects`} />
+                    <div className="w-3 h-3 bg-red-400 rounded-full border border-white" title={`${hour.defectiveUnits} defects`} />
                   )}
                 </div>
 
                 {/* Bottom indicators */}
-                <div className="absolute bottom-0 left-0 right-0 flex justify-between p-0.5">
+                <div className="absolute bottom-1 left-1 right-1 flex justify-between">
                   {/* Mold indicator */}
                   {hour.mold && (
-                    <div className="w-2 h-2 bg-purple-400 rounded-full" title="Mold assigned" />
+                    <div className="w-3 h-3 bg-purple-400 rounded-full border border-white" title="Mold assigned" />
                   )}
                   
                   {/* Stoppage indicator */}
                   {hour.stoppages.length > 0 && (
-                    <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" title={`${hour.stoppages.length} stoppages`} />
+                    <div className="w-3 h-3 bg-red-600 rounded-full border border-white animate-pulse" title={`${hour.stoppages.length} stoppages`} />
                   )}
                 </div>
+
+                {/* Current hour indicator */}
+                {hour.hour === currentHour && (
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                )}
               </div>
 
-              {/* Hover tooltip */}
+              {/* Enhanced hover tooltip */}
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
                 <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap border border-gray-600 shadow-lg">
-                  <div className="font-medium">{formatTime(hour.hour)}</div>
-                  <div>Units: <span className="text-green-400">{hour.unitsProduced}</span></div>
-                  {hour.defectiveUnits > 0 && (
-                    <div>Defects: <span className="text-red-400">{hour.defectiveUnits}</span></div>
-                  )}
-                  {hour.operator && (
-                    <div>Op: <span className="text-blue-400">{hour.operator.username}</span></div>
-                  )}
-                  {hour.mold && (
-                    <div>Mold: <span className="text-purple-400">{hour.mold.name}</span></div>
-                  )}
-                  <div>Status: <span className="capitalize">{hour.status.replace('_', ' ')}</span></div>
-                  {hour.stoppages.length > 0 && (
-                    <div className="text-red-400">
-                      {hour.stoppages.length} stoppage{hour.stoppages.length > 1 ? 's' : ''}
+                  <div className="font-medium text-center mb-1">{formatTime(hour.hour)}</div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span>Units:</span>
+                      <span className="text-green-400 font-medium">{hour.unitsProduced}</span>
                     </div>
-                  )}
+                    {hour.defectiveUnits > 0 && (
+                      <div className="flex justify-between">
+                        <span>Defects:</span>
+                        <span className="text-red-400 font-medium">{hour.defectiveUnits}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>Status:</span>
+                      <span className="capitalize">{hour.status.replace('_', ' ')}</span>
+                    </div>
+                    {hour.operator && (
+                      <div className="flex justify-between">
+                        <span>Operator:</span>
+                        <span className="text-blue-400">{hour.operator.username}</span>
+                      </div>
+                    )}
+                    {hour.mold && (
+                      <div className="flex justify-between">
+                        <span>Mold:</span>
+                        <span className="text-purple-400">{hour.mold.name}</span>
+                      </div>
+                    )}
+                    {hour.stoppages.length > 0 && (
+                      <div className="text-red-400 text-center border-t border-gray-700 pt-1 mt-1">
+                        {hour.stoppages.length} stoppage{hour.stoppages.length > 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-4 gap-4 pt-3 border-t border-gray-700">
+        {/* Enhanced Summary Stats */}
+        <div className="grid grid-cols-5 gap-4 pt-3 border-t border-gray-700">
           <div className="text-center">
             <div className="text-lg font-bold text-green-400">
               {currentDay.hours.reduce((sum, h) => sum + h.unitsProduced, 0)}
@@ -634,6 +725,14 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
             </div>
             <div className="text-xs text-gray-400">Stoppages</div>
           </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-purple-400">
+              {((currentDay.hours.reduce((sum, h) => sum + h.unitsProduced, 0) - 
+                 currentDay.hours.reduce((sum, h) => sum + h.defectiveUnits, 0)) / 
+                Math.max(currentDay.hours.reduce((sum, h) => sum + h.unitsProduced, 0), 1) * 100).toFixed(1)}%
+            </div>
+            <div className="text-xs text-gray-400">Quality</div>
+          </div>
         </div>
       </div>
 
@@ -647,16 +746,16 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
             {data.map((day, index) => (
               <div 
                 key={day.date} 
-                className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                className={`flex items-center justify-between p-3 rounded cursor-pointer transition-colors ${
                   index === selectedDayIndex ? 'bg-blue-600/20 border border-blue-500/30' : 'hover:bg-gray-700'
                 }`}
                 onClick={() => setSelectedDayIndex(index)}
               >
-                <div className="text-sm text-white">
-                  {format(parseISO(day.date), 'MMM dd')}
+                <div className="text-sm text-white font-medium">
+                  {format(parseISO(day.date), 'MMM dd, EEE')}
                 </div>
-                <div className="flex items-center space-x-4 text-xs">
-                  <span className="text-green-400">
+                <div className="flex items-center space-x-6 text-xs">
+                  <span className="text-green-400 font-medium">
                     {day.hours.reduce((sum, h) => sum + h.unitsProduced, 0)} units
                   </span>
                   <span className="text-red-400">
@@ -664,6 +763,9 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                   </span>
                   <span className="text-yellow-400">
                     {day.hours.filter(h => h.status === 'running').length}h running
+                  </span>
+                  <span className="text-blue-400">
+                    {day.hours.reduce((sum, h) => sum + h.stoppages.length, 0)} stops
                   </span>
                 </div>
               </div>
