@@ -177,6 +177,13 @@ class ApiService {
     });
   }
 
+  async updateProductionAssignment(data: any) {
+    return this.request('/analytics/production-assignment', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Configuration
   async getConfig() {
     return this.request('/config');

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import apiService from '../services/api';
+import socketService from '../services/socket';
 
 interface AuthContextType {
   user: User | null;
@@ -38,6 +39,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
+  useEffect(() => {
+    // Connect to socket when user is authenticated
+    if (user) {
+      socketService.connect();
+    } else {
+      socketService.disconnect();
+    }
+  }, [user]);
+
   const checkAuth = async () => {
     try {
       const userData = await apiService.getCurrentUser();
@@ -63,6 +73,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     setUser(null);
     apiService.clearToken();
+    socketService.disconnect();
   };
 
   const value = {

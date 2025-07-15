@@ -52,14 +52,17 @@ export interface ProductionHour {
   operator?: User;
   mold?: Mold;
   stoppages: StoppageRecord[];
+  runningMinutes?: number;
+  stoppageMinutes?: number;
 }
 
 export interface StoppageRecord {
-  id: string;
-  reason: 'planned' | 'mold_change' | 'breakdown' | 'maintenance' | 'material_shortage' | 'other';
+  _id: string;
+  reason: 'planned' | 'mold_change' | 'breakdown' | 'maintenance' | 'material_shortage' | 'other' | 'undefined';
   description?: string;
-  startTime: string;
-  endTime?: string;
+  startTime: string | null;
+  endTime?: string | null;
+  duration?: number;
   reportedBy?: User;
 }
 
@@ -82,6 +85,8 @@ export interface MachineStats {
   quality: number;
   performance: number;
   currentStatus: string;
+  totalRunningMinutes?: number;
+  totalStoppageMinutes?: number;
 }
 
 export interface Config {

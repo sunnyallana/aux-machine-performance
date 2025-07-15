@@ -29,64 +29,50 @@ router.get('/production-timeline/:machineId', auth, async (req, res) => {
     const productionRecords = await ProductionRecord.find({
       machineId,
       startTime: { $gte: startDate, $lte: endDate }
-    }).populate('operatorId moldId');
+    }).populate('operatorId moldId hourlyData.operatorId hourlyData.moldId');
 
-    // Get stoppage records
-    const stoppageRecords = await StoppageRecord.find({
-      machineId,
-      startTime: { $gte: startDate, $lte: endDate }
-    }).populate('reportedBy');
-
-    // Generate timeline data
+    // Generate timeline data for the last 7 days
     const timeline = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dayStart = new Date(d);
-      const dayEnd = new Date(d);
-      dayEnd.setHours(23, 59, 59, 999);
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setUTCDate(dayStart.getUTCDate() + 1);
 
       const dayData = {
         date: dayStart.toISOString().split('T')[0],
         hours: []
       };
 
+      // Find production record for this day
+      const dayRecord = productionRecords.find(record => {
+        const recordDate = new Date(record.startTime);
+        return recordDate.toDateString() === dayStart.toDateString();
+      });
+
       for (let hour = 0; hour < 24; hour++) {
-        const hourStart = new Date(dayStart);
-        hourStart.setHours(hour, 0, 0, 0);
-        const hourEnd = new Date(dayStart);
-        hourEnd.setHours(hour, 59, 59, 999);
-
-        // Find production record for this hour
-        const productionRecord = productionRecords.find(record => {
-          return record.hourlyData?.some(hourData => 
-            hourData.hour === hour &&
-            new Date(record.startTime).toDateString() === dayStart.toDateString()
-          );
-        });
-
-        // Find stoppage records for this hour
-        const stoppages = stoppageRecords.filter(stoppage => {
-          const stoppageStart = new Date(stoppage.startTime);
-          const stoppageEnd = stoppage.endTime ? new Date(stoppage.endTime) : new Date();
-          return stoppageStart <= hourEnd && stoppageEnd >= hourStart;
-        });
-
-        const hourData = productionRecord?.hourlyData?.find(h => h.hour === hour);
+        const hourData = dayRecord?.hourlyData?.find(h => h.hour === hour);
+        
+        // Calculate running vs stoppage time
+        const runningMinutes = hourData?.runningMinutes || 0;
+        const stoppageMinutes = hourData?.stoppageMinutes || 0;
+        
+        // Determine status based on activity
+        let status = 'stopped';
+        if (runningMinutes > 0) {
+          status = stoppageMinutes > runningMinutes ? 'stopped' : 'running';
+        }
 
         dayData.hours.push({
           hour,
           unitsProduced: hourData?.unitsProduced || 0,
           defectiveUnits: hourData?.defectiveUnits || 0,
-          status: hourData?.status || 'stopped',
-          operator: productionRecord?.operatorId,
-          mold: productionRecord?.moldId,
-          stoppages: stoppages.map(s => ({
-            id: s._id,
-            reason: s.reason,
-            description: s.description,
-            startTime: s.startTime,
-            endTime: s.endTime,
-            reportedBy: s.reportedBy
-          }))
+          status: hourData?.status || status,
+          operator: hourData?.operatorId || dayRecord?.operatorId,
+          mold: hourData?.moldId || dayRecord?.moldId,
+          stoppages: hourData?.stoppages || [],
+          runningMinutes,
+          stoppageMinutes
         });
       }
 
@@ -102,13 +88,180 @@ router.get('/production-timeline/:machineId', auth, async (req, res) => {
 // Add stoppage record
 router.post('/stoppage', auth, async (req, res) => {
   try {
-    const stoppage = new StoppageRecord({
-      ...req.body,
-      reportedBy: req.user._id
+    const { machineId, hour, date, reason, description, duration, pendingStoppageId } = req.body;
+    const io = req.app.get('io');
+    
+    console.log('Received stoppage request:', { machineId, hour, date, reason, description, duration, pendingStoppageId });
+    
+    // Find production record for the specified date
+    let productionRecord = await ProductionRecord.findOne({
+      machineId,
+      startTime: {
+        $gte: new Date(date + 'T00:00:00.000Z'),
+        $lt: new Date(date + 'T23:59:59.999Z')
+      }
     });
-    await stoppage.save();
-    res.status(201).json(stoppage);
+
+    if (!productionRecord) {
+      productionRecord = new ProductionRecord({
+        machineId,
+        startTime: new Date(date + 'T00:00:00.000Z'),
+        hourlyData: []
+      });
+    }
+
+    // Find or create hourly data
+    let hourData = productionRecord.hourlyData.find(h => h.hour === hour);
+    if (!hourData) {
+      hourData = {
+        hour,
+        unitsProduced: 0,
+        defectiveUnits: 0,
+        status: 'stopped',
+        runningMinutes: 0,
+        stoppageMinutes: 0,
+        stoppages: []
+      };
+      productionRecord.hourlyData.push(hourData);
+    }
+
+    // If this is updating a pending stoppage, find and update it
+    if (pendingStoppageId) {
+      const stoppageIndex = hourData.stoppages.findIndex(s => 
+        s._id && s._id.toString() === pendingStoppageId
+      );
+      
+      if (stoppageIndex >= 0) {
+        // Update the existing pending stoppage
+        hourData.stoppages[stoppageIndex].reason = reason;
+        hourData.stoppages[stoppageIndex].description = description;
+        hourData.stoppages[stoppageIndex].isPending = false;
+        hourData.stoppages[stoppageIndex].endTime = new Date();
+      } else {
+        // If pending stoppage not found, create new one
+        const stoppageStart = new Date(`${date}T${hour.toString().padStart(2, '0')}:00:00`);
+        const stoppageEnd = new Date(stoppageStart.getTime() + (duration * 60 * 1000));
+        
+        hourData.stoppages.push({
+          reason,
+          description,
+          startTime: stoppageStart,
+          endTime: stoppageEnd,
+          duration,
+          isPending: false
+        });
+      }
+    } else {
+      // Add new stoppage
+      const stoppageStart = new Date(`${date}T${hour.toString().padStart(2, '0')}:00:00`);
+      const stoppageEnd = new Date(stoppageStart.getTime() + (duration * 60 * 1000));
+      
+      hourData.stoppages.push({
+        reason,
+        description,
+        startTime: stoppageStart,
+        endTime: stoppageEnd,
+        duration,
+        isPending: false
+      });
+
+      hourData.stoppageMinutes = Math.min(60, hourData.stoppageMinutes + duration);
+    }
+
+    hourData.status = 'stopped';
+
+    await productionRecord.save();
+
+    // Emit socket event
+    io.emit('stoppage-added', {
+      machineId,
+      hour,
+      date,
+      stoppage: {
+        reason,
+        description,
+        duration
+      },
+      timestamp: new Date()
+    });
+
+    console.log('Stoppage saved successfully');
+    res.status(201).json({ message: 'Stoppage recorded successfully' });
   } catch (error) {
+    console.error('Error saving stoppage:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Update production assignment
+router.post('/production-assignment', auth, async (req, res) => {
+  try {
+    const { machineId, hour, date, operatorId, moldId, defectiveUnits } = req.body;
+    const io = req.app.get('io');
+    
+    console.log('Received assignment request:', { machineId, hour, date, operatorId, moldId, defectiveUnits });
+    
+    // Find production record
+    let productionRecord = await ProductionRecord.findOne({
+      machineId,
+      startTime: {
+        $gte: new Date(date + 'T00:00:00.000Z'),
+        $lt: new Date(date + 'T23:59:59.999Z')
+      }
+    });
+
+    if (!productionRecord) {
+      productionRecord = new ProductionRecord({
+        machineId,
+        startTime: new Date(date + 'T00:00:00.000Z'),
+        hourlyData: []
+      });
+    }
+
+    // Find or create hourly data
+    let hourData = productionRecord.hourlyData.find(h => h.hour === hour);
+    if (!hourData) {
+      hourData = {
+        hour,
+        unitsProduced: 0,
+        defectiveUnits: 0,
+        status: 'stopped',
+        runningMinutes: 0,
+        stoppageMinutes: 0,
+        stoppages: []
+      };
+      productionRecord.hourlyData.push(hourData);
+    }
+
+    // Update assignments
+    if (operatorId) hourData.operatorId = operatorId;
+    if (moldId) hourData.moldId = moldId;
+    if (defectiveUnits !== undefined) {
+      hourData.defectiveUnits = defectiveUnits;
+      
+      // Update total defective units
+      productionRecord.defectiveUnits = productionRecord.hourlyData.reduce(
+        (sum, h) => sum + (h.defectiveUnits || 0), 0
+      );
+    }
+
+    await productionRecord.save();
+
+    // Emit socket event
+    io.emit('production-assignment-updated', {
+      machineId,
+      hour,
+      date,
+      operatorId,
+      moldId,
+      defectiveUnits,
+      timestamp: new Date()
+    });
+
+    console.log('Assignment saved successfully');
+    res.json({ message: 'Production assignment updated successfully' });
+  } catch (error) {
+    console.error('Error saving assignment:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -163,11 +316,6 @@ router.get('/machine-stats/:machineId', auth, async (req, res) => {
       startTime: { $gte: startDate, $lte: endDate }
     });
 
-    const stoppageRecords = await StoppageRecord.find({
-      machineId,
-      startTime: { $gte: startDate, $lte: endDate }
-    });
-
     const totalUnitsProduced = productionRecords.reduce((sum, record) => 
       sum + record.unitsProduced, 0
     );
@@ -176,38 +324,40 @@ router.get('/machine-stats/:machineId', auth, async (req, res) => {
       sum + record.defectiveUnits, 0
     );
 
-    // Calculate OEE, MTTR, MTBF
-    const totalRunTime = productionRecords.reduce((sum, record) => {
-      if (record.endTime) {
-        return sum + (new Date(record.endTime) - new Date(record.startTime));
-      }
-      return sum;
-    }, 0);
+    // Calculate time-based metrics
+    let totalRunningMinutes = 0;
+    let totalStoppageMinutes = 0;
+    let totalStoppages = 0;
 
-    const totalStoppageTime = stoppageRecords.reduce((sum, record) => {
-      const endTime = record.endTime ? new Date(record.endTime) : new Date();
-      return sum + (endTime - new Date(record.startTime));
-    }, 0);
+    productionRecords.forEach(record => {
+      record.hourlyData.forEach(hourData => {
+        totalRunningMinutes += hourData.runningMinutes || 0;
+        totalStoppageMinutes += hourData.stoppageMinutes || 0;
+        totalStoppages += hourData.stoppages?.length || 0;
+      });
+    });
 
-    const totalTime = endDate - startDate;
-    const availability = totalRunTime / (totalTime - totalStoppageTime);
+    const totalMinutes = totalRunningMinutes + totalStoppageMinutes;
+    const availability = totalMinutes > 0 ? (totalRunningMinutes / totalMinutes) : 0;
     const quality = totalUnitsProduced > 0 ? (totalUnitsProduced - totalDefectiveUnits) / totalUnitsProduced : 0;
-    const performance = 0.8; // This would be calculated based on ideal cycle time
+    const performance = 0.85; // This would be calculated based on ideal cycle time
     const oee = availability * quality * performance;
 
-    const mtbf = stoppageRecords.length > 0 ? totalRunTime / stoppageRecords.length : 0;
-    const mttr = stoppageRecords.length > 0 ? totalStoppageTime / stoppageRecords.length : 0;
+    const mtbf = totalStoppages > 0 ? totalRunningMinutes / totalStoppages : 0;
+    const mttr = totalStoppages > 0 ? totalStoppageMinutes / totalStoppages : 0;
 
     res.json({
       totalUnitsProduced,
       totalDefectiveUnits,
       oee: Math.round(oee * 100),
-      mtbf: Math.round(mtbf / (1000 * 60 * 60)), // Convert to hours
-      mttr: Math.round(mttr / (1000 * 60)), // Convert to minutes
+      mtbf: Math.round(mtbf), // in minutes
+      mttr: Math.round(mttr), // in minutes
       availability: Math.round(availability * 100),
       quality: Math.round(quality * 100),
       performance: Math.round(performance * 100),
-      currentStatus: machine.status
+      currentStatus: machine.status,
+      totalRunningMinutes,
+      totalStoppageMinutes
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

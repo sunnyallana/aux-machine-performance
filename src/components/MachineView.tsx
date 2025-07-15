@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Machine, ProductionTimelineDay, MachineStats } from '../types';
 import apiService from '../services/api';
+import socketService from '../services/socket';
 import ProductionTimeline from './ProductionTimeline';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -20,8 +21,6 @@ import {
   Save
 } from 'lucide-react';
 
-import ProductionTimelineWithSampleData from './ProductionTimeline';
-
 const MachineView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -35,15 +34,55 @@ const MachineView: React.FC = () => {
     name: '',
     description: ''
   });
-  const [availableOperators, setAvailableOperators] = useState<any[]>([]);
-  const [availableMolds, setAvailableMolds] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) {
       fetchMachineData();
-      fetchOperatorsAndMolds();
+      setupSocketListeners();
     }
+
+    return () => {
+      if (id) {
+        socketService.leaveMachine(id);
+      }
+    };
   }, [id, selectedPeriod]);
+
+  const setupSocketListeners = () => {
+    if (!id) return;
+
+    socketService.connect();
+    socketService.joinMachine(id);
+
+    const handleProductionUpdate = (update: any) => {
+      if (update.machineId === id) {
+        // Refresh stats when production updates
+        fetchStats();
+      }
+    };
+
+    const handleStoppageDetected = (stoppage: any) => {
+      if (stoppage.machineId === id) {
+        toast.warning(`Stoppage detected: ${stoppage.duration} minutes`, {
+          position: "top-right",
+          autoClose: 5000,
+          theme: "dark"
+        });
+        // Refresh data
+        fetchMachineData();
+      }
+    };
+
+    socketService.on('production-update', handleProductionUpdate);
+    socketService.on('stoppage-detected', handleStoppageDetected);
+    socketService.on('stoppage-added', handleStoppageDetected);
+
+    return () => {
+      socketService.off('production-update', handleProductionUpdate);
+      socketService.off('stoppage-detected', handleStoppageDetected);
+      socketService.off('stoppage-added', handleStoppageDetected);
+    };
+  };
 
   const fetchMachineData = async () => {
     try {
@@ -69,16 +108,12 @@ const MachineView: React.FC = () => {
     }
   };
 
-  const fetchOperatorsAndMolds = async () => {
+  const fetchStats = async () => {
     try {
-      const [operators, molds] = await Promise.all([
-        apiService.getUsers(),
-        apiService.getMolds()
-      ]);
-      setAvailableOperators(operators.filter((u: any) => u.role === 'operator'));
-      setAvailableMolds(molds);
+      const statsData = await apiService.getMachineStats(id!, selectedPeriod);
+      setStats(statsData);
     } catch (err) {
-      console.error('Failed to fetch operators and molds:', err);
+      console.error('Failed to fetch stats:', err);
     }
   };
 
@@ -97,8 +132,12 @@ const MachineView: React.FC = () => {
 
   const handleUpdateProduction = async (machineId: string, hour: number, date: string, data: any) => {
     try {
-      // This would need a new API endpoint to update production assignments
-      console.log('Update production:', { machineId, hour, date, data });
+      await apiService.updateProductionAssignment({
+        machineId,
+        hour,
+        date,
+        ...data
+      });
       toast.success('Production data updated');
       fetchMachineData(); // Refresh timeline data
     } catch (err) {
@@ -263,7 +302,7 @@ const MachineView: React.FC = () => {
           <Clock className="h-6 w-6 text-blue-400 mr-3" />
           <div>
             <p className="text-xs text-gray-400">MTBF</p>
-            <p className="text-lg font-semibold text-blue-400">{stats.mtbf}h</p>
+            <p className="text-lg font-semibold text-blue-400">{stats.mtbf}m</p>
           </div>
         </div>
 
@@ -387,11 +426,17 @@ const MachineView: React.FC = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400">MTBF</span>
-              <span className="text-blue-400 font-medium">{stats.mtbf} hours</span>
+              <span className="text-blue-400 font-medium">{stats.mtbf} minutes</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400">MTTR</span>
               <span className="text-purple-400 font-medium">{stats.mttr} minutes</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Running Time</span>
+              <span className="text-green-400 font-medium">
+                {Math.round((stats.totalRunningMinutes || 0) / 60 * 10) / 10}h
+              </span>
             </div>
           </div>
         </div>
@@ -400,9 +445,9 @@ const MachineView: React.FC = () => {
       {/* Production Timeline */}
       <div className="bg-gray-800 rounded-lg border border-gray-700">
         <div className="p-6 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">7-Day Production Timeline</h2>
+          <h2 className="text-lg font-semibold text-white">Real-time Production Timeline</h2>
           <p className="text-sm text-gray-400 mt-1">
-            Hourly production data with operator and mold information
+            Live production data with operator and mold information
           </p>
         </div>
         <div className="p-6">

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Industrial IoT Signal Recorder Daemon Installation Script
+# Pin Signal Daemon Installation Script
 
-echo "Installing Industrial IoT Signal Recorder Daemon..."
+echo "Installing Pin Signal Daemon..."
 
 # Create virtual environment
 python3 -m venv venv
@@ -11,25 +11,11 @@ source venv/bin/activate
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Install snap7 library (required for PLC communication)
-echo "Installing snap7 library..."
-
-# For Ubuntu/Debian
-if command -v apt-get &> /dev/null; then
-    sudo apt-get update
-    sudo apt-get install -y libsnap7-1 libsnap7-dev
-fi
-
-# For CentOS/RHEL
-if command -v yum &> /dev/null; then
-    sudo yum install -y snap7-devel
-fi
-
 # Create systemd service file
-sudo tee /etc/systemd/system/iot-signal-recorder.service > /dev/null <<EOF
+sudo tee /etc/systemd/system/pin-signal-daemon.service > /dev/null <<EOF
 [Unit]
-Description=Industrial IoT Signal Recorder Daemon
-After=network.target mongodb.service
+Description=Industrial IoT Pin Signal Daemon
+After=network.target
 
 [Service]
 Type=simple
@@ -37,7 +23,7 @@ User=iot
 Group=iot
 WorkingDirectory=$(pwd)
 Environment=PATH=$(pwd)/venv/bin
-ExecStart=$(pwd)/venv/bin/python signal_recorder.py
+ExecStart=$(pwd)/venv/bin/python signal_daemon.py
 Restart=always
 RestartSec=10
 
@@ -52,13 +38,13 @@ fi
 
 # Set permissions
 sudo chown -R iot:iot .
-sudo chmod +x signal_recorder.py
+sudo chmod +x signal_daemon.py
 
 # Enable and start service
 sudo systemctl daemon-reload
-sudo systemctl enable iot-signal-recorder.service
+sudo systemctl enable pin-signal-daemon.service
 
 echo "Installation complete!"
-echo "To start the daemon: sudo systemctl start iot-signal-recorder"
-echo "To check status: sudo systemctl status iot-signal-recorder"
-echo "To view logs: sudo journalctl -u iot-signal-recorder -f"
+echo "To start the daemon: sudo systemctl start pin-signal-daemon"
+echo "To check status: sudo systemctl status pin-signal-daemon"
+echo "To view logs: sudo journalctl -u pin-signal-daemon -f"

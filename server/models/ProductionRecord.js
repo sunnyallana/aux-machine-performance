@@ -34,8 +34,35 @@ const productionRecordSchema = new mongoose.Schema({
     hour: Number,
     unitsProduced: Number,
     defectiveUnits: Number,
-    status: String
-  }]
+    status: String,
+    operatorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    moldId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Mold'
+    },
+    stoppages: [{
+      reason: String,
+      description: String,
+      startTime: Date,
+      endTime: Date,
+      duration: Number
+    }],
+    runningMinutes: {
+      type: Number,
+      default: 0
+    },
+    stoppageMinutes: {
+      type: Number,
+      default: 0
+    }
+  }],
+  lastActivityTime: {
+    type: Date,
+    default: Date.now
+  }
 }, {
   timestamps: true
 });
