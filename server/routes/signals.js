@@ -10,7 +10,7 @@ const router = express.Router();
 // Store last activity times for machines
 const machineLastActivity = new Map();
 const machineLastCycleSignal = new Map();
-const pendingStoppages = new Map(); // Track machines with pending stoppages
+const pendingStoppages = new Map();
 const machineLastPowerSignal = new Map();
 
 // Process pin data from Python daemon
@@ -156,12 +156,15 @@ async function updateProductionRecord(machineId, currentTime, io) {
     
     // Update running minutes (assume each cycle represents some running time)
     const lastActivity = machineLastActivity.get(machineId.toString());
-    if (lastActivity) {
-      const timeDiff = (currentTime - lastActivity) / (1000 * 60); // minutes
-      if (timeDiff <= 5) { // Only count if within reasonable time
-        hourData.runningMinutes = Math.min(60, hourData.runningMinutes + 1);
+      if (lastActivity) {
+        const timeDiffMinutes = (currentTime - lastActivity) / (1000 * 60);
+        if (timeDiffMinutes <= 5) {
+          hourData.runningMinutes = Math.min(
+            60, 
+            hourData.runningMinutes + timeDiffMinutes
+          );
+        }
       }
-    }
 
     // Update total units produced
     productionRecord.unitsProduced = productionRecord.hourlyData.reduce(
