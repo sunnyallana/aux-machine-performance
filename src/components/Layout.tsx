@@ -10,7 +10,8 @@ import {
   Menu,
   Activity,
   X,
-  PackagePlus
+  PackagePlus,
+  FileText
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -32,6 +33,7 @@ const Layout: React.FC = () => {
       { name: 'Sensors', href: '/sensors', icon: Activity },
       { name: 'Departments', href: '/departments', icon: Building2 },
       { name: 'Molds', href: '/molds', icon: PackagePlus},
+      { name: 'Reports', href: '/reports', icon: FileText },
       { name: 'Configuration', href: '/config', icon: Settings },
       
     ] : []),

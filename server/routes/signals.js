@@ -1,8 +1,10 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const SignalData = require('../models/SignalData');
 const SensorPinMapping = require('../models/SensorPinMapping');
 const ProductionRecord = require('../models/ProductionRecord');
 const StoppageRecord = require('../models/StoppageRecord');
+const Config = require('../models/Config');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -10,9 +12,23 @@ const router = express.Router();
 // Store last activity times for machines
 const machineLastActivity = new Map();
 const machineLastCycleSignal = new Map();
-const pendingStoppages = new Map();
+const pendingStoppages = new Map(); // Track machines with pending stoppages
 const machineLastPowerSignal = new Map();
+const machineStates = new Map(); // Track machine states
 
+// Get configuration for timeouts
+const getSignalTimeouts = async () => {
+  try {
+    const config = await Config.findOne();
+    return {
+      powerTimeout: (config?.signalTimeouts?.powerSignalTimeout || 2) * 60 * 1000, // Convert to milliseconds
+      cycleTimeout: (config?.signalTimeouts?.cycleSignalTimeout || 2) * 60 * 1000
+    };
+  } catch (error) {
+    console.error('Error getting signal timeouts:', error);
+    return { powerTimeout: 2 * 60 * 1000, cycleTimeout: 2 * 60 * 1000 };
+  }
+};
 // Process pin data from Python daemon
 router.post('/pin-data', async (req, res) => {
   try {
@@ -42,6 +58,7 @@ router.post('/pin-data', async (req, res) => {
       });
 
     const processedMachines = new Set();
+    const timeouts = await getSignalTimeouts();
 
     // Process each pin
     for (let pinIndex = 0; pinIndex < 8; pinIndex++) {
@@ -67,7 +84,9 @@ router.post('/pin-data', async (req, res) => {
       await signalData.save();
 
       if (sensor.sensorType === 'power') {
-        machineLastPowerSignal.set(machine._id.toString(), currentTime);
+        if (pinValue === 1) {
+          machineLastPowerSignal.set(machine._id.toString(), currentTime);
+        }
         
         // Emit power signal to frontend
         io.emit('power-signal', {
@@ -75,6 +94,9 @@ router.post('/pin-data', async (req, res) => {
           value: pinValue,
           timestamp: currentTime
         });
+
+        // Update machine state
+        updateMachineState(machine._id.toString(), 'power', pinValue === 1, currentTime, io);
       }
 
       // Process based on sensor type
@@ -85,6 +107,8 @@ router.post('/pin-data', async (req, res) => {
         
         // Update last cycle signal time and clear any pending stoppages
         machineLastCycleSignal.set(machine._id.toString(), currentTime);
+        updateMachineState(machine._id.toString(), 'cycle', true, currentTime, io);
+        
         if (pendingStoppages.has(machine._id.toString())) {
           pendingStoppages.delete(machine._id.toString());
           // Emit stoppage resolved event
@@ -100,7 +124,7 @@ router.post('/pin-data', async (req, res) => {
     }
 
     // Check for stoppages (no unit-cycle for 2 minutes)
-    await checkForStoppages(pinMappings, currentTime, io);
+    await checkForStoppages(pinMappings, currentTime, io, timeouts);
 
     res.json({ 
       message: 'Pin data processed successfully',
@@ -113,6 +137,46 @@ router.post('/pin-data', async (req, res) => {
   }
 });
 
+// Update machine state based on power and cycle signals
+function updateMachineState(machineId, signalType, isActive, timestamp, io) {
+  const currentState = machineStates.get(machineId) || { 
+    power: false, 
+    cycle: false, 
+    lastUpdate: timestamp,
+    state: 'inactive_not_producing'
+  };
+
+  if (signalType === 'power') {
+    currentState.power = isActive;
+  } else if (signalType === 'cycle') {
+    currentState.cycle = isActive;
+  }
+
+  // Determine machine state
+  let newState;
+  if (currentState.power && currentState.cycle) {
+    newState = 'running_producing';
+  } else if (!currentState.power && currentState.cycle) {
+    newState = 'inactive_producing';
+  } else if (currentState.power && !currentState.cycle) {
+    newState = 'running_not_producing';
+  } else {
+    newState = 'inactive_not_producing';
+  }
+
+  currentState.state = newState;
+  currentState.lastUpdate = timestamp;
+  machineStates.set(machineId, currentState);
+
+  // Emit machine state update
+  io.emit('machine-state-update', {
+    machineId,
+    state: newState,
+    power: currentState.power,
+    cycle: currentState.cycle,
+    timestamp
+  });
+}
 async function updateProductionRecord(machineId, currentTime, io) {
   try {
     const currentHour = currentTime.getHours();
@@ -154,17 +218,8 @@ async function updateProductionRecord(machineId, currentTime, io) {
     hourData.unitsProduced += 1;
     hourData.status = 'running';
     
-    // Update running minutes (assume each cycle represents some running time)
-    const lastActivity = machineLastActivity.get(machineId.toString());
-      if (lastActivity) {
-        const timeDiffMinutes = (currentTime - lastActivity) / (1000 * 60);
-        if (timeDiffMinutes <= 5) {
-          hourData.runningMinutes = Math.min(
-            60, 
-            hourData.runningMinutes + timeDiffMinutes
-          );
-        }
-      }
+    // Don't automatically increment running minutes per unit
+    // Running minutes should be calculated based on actual time periods
 
     // Update total units produced
     productionRecord.unitsProduced = productionRecord.hourlyData.reduce(
@@ -193,11 +248,12 @@ async function updateProductionRecord(machineId, currentTime, io) {
   }
 }
 
-async function checkForStoppages(pinMappings, currentTime, io) {
+async function checkForStoppages(pinMappings, currentTime, io, timeouts) {
   try {
-    const twoMinutesAgo = new Date(currentTime.getTime() - 2 * 60 * 1000); // Changed to 2 minutes
+    const powerTimeoutAgo = new Date(currentTime.getTime() - timeouts.powerTimeout);
+    const cycleTimeoutAgo = new Date(currentTime.getTime() - timeouts.cycleTimeout);
     
-    // Check power sensors
+    // Check power sensors and update machine states
     const machinesWithPowerSensors = new Set();
     pinMappings.forEach(mapping => {
       if (mapping.sensorId && mapping.sensorId.sensorType === 'power') {
@@ -206,19 +262,24 @@ async function checkForStoppages(pinMappings, currentTime, io) {
     });
 
     for (const machineId of machinesWithPowerSensors) {
-    const lastPowerTime = machineLastPowerSignal.get(machineId);
-    if (lastPowerTime && lastPowerTime < twoMinutesAgo && !pendingStoppages.has(machineId)) {
-      pendingStoppages.set(machineId, {
-        startTime: lastPowerTime,
-        detectedAt: currentTime
-      });
-      
-      await recordPendingStoppage(machineId, lastPowerTime, currentTime, io);
+      const lastPowerTime = machineLastPowerSignal.get(machineId);
+      if (lastPowerTime && lastPowerTime < powerTimeoutAgo) {
+        // Update machine state to show power is off
+        updateMachineState(machineId, 'power', false, currentTime, io);
+        
+        // Emit power timeout event
+        io.emit('power-timeout', {
+          machineId,
+          lastPowerTime,
+          timestamp: currentTime
+        });
+      } else if (!lastPowerTime) {
+        // If we've never received a power signal, assume power is off
+        updateMachineState(machineId, 'power', false, currentTime, io);
+      }
     }
-  }
     
-    
-    // Get all machines with unit-cycle sensors
+    // Check cycle sensors for stoppages
     const machinesWithCycleSensors = new Set();
     pinMappings.forEach(mapping => {
       if (mapping.sensorId && mapping.sensorId.sensorType === 'unit-cycle') {
@@ -228,15 +289,32 @@ async function checkForStoppages(pinMappings, currentTime, io) {
 
     for (const machineId of machinesWithCycleSensors) {
       const lastCycleTime = machineLastCycleSignal.get(machineId);
+      const lastPowerTime = machineLastPowerSignal.get(machineId);
+      const hasPower = lastPowerTime && lastPowerTime >= powerTimeoutAgo;
       
-      if (lastCycleTime && lastCycleTime < twoMinutesAgo && !pendingStoppages.has(machineId)) {
+      // Check for cycle timeout (only if machine has power)
+      const shouldDetectStoppage = hasPower && (
+        (lastCycleTime && lastCycleTime < cycleTimeoutAgo) || 
+        (!lastCycleTime && machineLastActivity.has(machineId))
+      );
+      
+      if (shouldDetectStoppage && !pendingStoppages.has(machineId)) {
         // Mark as pending stoppage and emit event for user to categorize
+        const stoppageStartTime = lastCycleTime || new Date(currentTime.getTime() - timeouts.cycleTimeout);
+        
         pendingStoppages.set(machineId, {
-          startTime: lastCycleTime,
+          startTime: stoppageStartTime,
           detectedAt: currentTime
         });
 
-        await recordPendingStoppage(machineId, lastCycleTime, currentTime, io);
+        await recordPendingStoppage(machineId, stoppageStartTime, currentTime, io);
+      }
+      
+      // Update machine state for cycle signal
+      if (lastCycleTime && lastCycleTime >= cycleTimeoutAgo) {
+        updateMachineState(machineId, 'cycle', true, currentTime, io);
+      } else {
+        updateMachineState(machineId, 'cycle', false, currentTime, io);
       }
     }
   } catch (error) {

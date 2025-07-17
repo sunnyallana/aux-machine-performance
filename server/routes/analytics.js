@@ -88,10 +88,20 @@ router.get('/production-timeline/:machineId', auth, async (req, res) => {
 // Add stoppage record
 router.post('/stoppage', auth, async (req, res) => {
   try {
-    const { machineId, hour, date, reason, description, duration, pendingStoppageId } = req.body;
+    const { machineId, hour, date, reason, description, duration, pendingStoppageId, sapNotificationNumber } = req.body;
     const io = req.app.get('io');
     
-    console.log('Received stoppage request:', { machineId, hour, date, reason, description, duration, pendingStoppageId });
+    console.log('Received stoppage request:', { machineId, hour, date, reason, description, duration, pendingStoppageId, sapNotificationNumber });
+    
+    // Validate SAP notification number for breakdown
+    if (reason === 'breakdown' && (!sapNotificationNumber || sapNotificationNumber.trim() === '')) {
+      return res.status(400).json({ message: 'SAP notification number is required for breakdown stoppages' });
+    }
+    
+    // Validate machineId
+    if (!mongoose.Types.ObjectId.isValid(machineId)) {
+      return res.status(400).json({ message: 'Invalid machine ID' });
+    }
     
     // Find production record for the specified date
     let productionRecord = await ProductionRecord.findOne({
@@ -135,40 +145,67 @@ router.post('/stoppage', auth, async (req, res) => {
         // Update the existing pending stoppage
         hourData.stoppages[stoppageIndex].reason = reason;
         hourData.stoppages[stoppageIndex].description = description;
+        if (reason === 'breakdown') {
+          hourData.stoppages[stoppageIndex].sapNotificationNumber = sapNotificationNumber;
+        }
         hourData.stoppages[stoppageIndex].isPending = false;
+        hourData.stoppages[stoppageIndex].isClassified = true;
         hourData.stoppages[stoppageIndex].endTime = new Date();
       } else {
         // If pending stoppage not found, create new one
         const stoppageStart = new Date(`${date}T${hour.toString().padStart(2, '0')}:00:00`);
         const stoppageEnd = new Date(stoppageStart.getTime() + (duration * 60 * 1000));
         
-        hourData.stoppages.push({
+        const newStoppage = {
           reason,
           description,
           startTime: stoppageStart,
           endTime: stoppageEnd,
           duration,
-          isPending: false
-        });
+          isPending: false,
+          isClassified: true
+        };
+        
+        if (reason === 'breakdown') {
+          newStoppage.sapNotificationNumber = sapNotificationNumber;
+        }
+        
+        hourData.stoppages.push(newStoppage);
       }
     } else {
       // Add new stoppage
       const stoppageStart = new Date(`${date}T${hour.toString().padStart(2, '0')}:00:00`);
       const stoppageEnd = new Date(stoppageStart.getTime() + (duration * 60 * 1000));
       
-      hourData.stoppages.push({
+      const newStoppage = {
         reason,
         description,
         startTime: stoppageStart,
         endTime: stoppageEnd,
         duration,
-        isPending: false
-      });
+        isPending: false,
+        isClassified: true
+      };
+      
+      if (reason === 'breakdown') {
+        newStoppage.sapNotificationNumber = sapNotificationNumber;
+      }
+      
+      hourData.stoppages.push(newStoppage);
 
       hourData.stoppageMinutes = Math.min(60, hourData.stoppageMinutes + duration);
     }
 
-    hourData.status = 'stopped';
+    // Set status based on reason with specific colors
+    if (reason === 'breakdown') {
+      hourData.status = 'breakdown';
+    } else if (reason === 'mold_change') {
+      hourData.status = 'mold_change';
+    } else if (reason === 'maintenance') {
+      hourData.status = 'maintenance';
+    } else {
+      hourData.status = 'stopped';
+    }
 
     await productionRecord.save();
 
@@ -180,7 +217,8 @@ router.post('/stoppage', auth, async (req, res) => {
       stoppage: {
         reason,
         description,
-        duration
+        duration,
+        sapNotificationNumber
       },
       timestamp: new Date()
     });
@@ -200,6 +238,34 @@ router.post('/production-assignment', auth, async (req, res) => {
     const io = req.app.get('io');
     
     console.log('Received assignment request:', { machineId, hour, date, operatorId, moldId, defectiveUnits });
+    
+    // Validate and convert operatorId to ObjectId if provided
+    let validOperatorId = null;
+    if (operatorId && operatorId.trim() !== '') {
+      // Check if it's already a valid ObjectId
+      if (mongoose.Types.ObjectId.isValid(operatorId)) {
+        validOperatorId = new mongoose.Types.ObjectId(operatorId);
+      } else {
+        // Try to find user by username
+        const User = require('../models/User');
+        const user = await User.findOne({ username: operatorId });
+        if (user) {
+          validOperatorId = user._id;
+        } else {
+          return res.status(400).json({ message: 'Invalid operator specified' });
+        }
+      }
+    }
+
+    // Validate and convert moldId to ObjectId if provided
+    let validMoldId = null;
+    if (moldId && moldId.trim() !== '') {
+      if (mongoose.Types.ObjectId.isValid(moldId)) {
+        validMoldId = new mongoose.Types.ObjectId(moldId);
+      } else {
+        return res.status(400).json({ message: 'Invalid mold ID specified' });
+      }
+    }
     
     // Find production record
     let productionRecord = await ProductionRecord.findOne({
@@ -234,8 +300,8 @@ router.post('/production-assignment', auth, async (req, res) => {
     }
 
     // Update assignments
-    if (operatorId) hourData.operatorId = operatorId;
-    if (moldId) hourData.moldId = moldId;
+    if (validOperatorId) hourData.operatorId = validOperatorId;
+    if (validMoldId) hourData.moldId = validMoldId;
     if (defectiveUnits !== undefined) {
       hourData.defectiveUnits = defectiveUnits;
       
@@ -252,8 +318,8 @@ router.post('/production-assignment', auth, async (req, res) => {
       machineId,
       hour,
       date,
-      operatorId,
-      moldId,
+      operatorId: validOperatorId,
+      moldId: validMoldId,
       defectiveUnits,
       timestamp: new Date()
     });

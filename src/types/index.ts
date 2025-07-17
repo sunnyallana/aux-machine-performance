@@ -1,5 +1,6 @@
 export interface User {
-  id: string;
+  _id?: string;
+  id?: string;
   username: string;
   email: string;
   role: 'admin' | 'operator';
@@ -96,6 +97,16 @@ export interface Config {
     rack: number;
     slot: number;
   };
+  signalTimeouts?: {
+    powerSignalTimeout: number;
+    cycleSignalTimeout: number;
+  };
+  shifts?: Array<{
+    name: string;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+  }>;
   email: {
     senderEmail: string;
     senderPassword: string;

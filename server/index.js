@@ -14,6 +14,7 @@ const configRoutes = require('./routes/config');
 const analyticsRoutes = require('./routes/analytics');
 const userRoutes = require('./routes/users');
 const moldRoutes = require('./routes/molds.js');
+const reportRoutes = require('./routes/reports');
 
 dotenv.config();
 
@@ -70,6 +71,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/molds', moldRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -10,7 +10,8 @@ import {
   Cpu,
   Link,
   Plus,
-  Trash2
+  Trash2,
+  Clock
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -191,6 +192,8 @@ const Configuration: React.FC = () => {
           {[
             { id: 'plc', label: 'PLC Configuration', icon: Cpu },
             { id: 'email', label: 'Email Settings', icon: Mail },
+            { id: 'signals', label: 'Signal Settings', icon: Settings },
+            { id: 'shifts', label: 'Shift Management', icon: Clock },
             { id: 'mapping', label: 'Pin Mapping', icon: Link }
           ].map((tab) => (
             <button
@@ -361,6 +364,225 @@ const Configuration: React.FC = () => {
                 <Save className="h-4 w-4" />
                 <span>{saving ? 'Saving...' : 'Save Email Settings'}</span>
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Signal Settings Tab */}
+        {activeTab === 'signals' && config && (
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center space-x-2 mb-4">
+              <Settings className="h-5 w-5 text-blue-400" />
+              <h2 className="text-lg font-semibold text-white">Signal Timeout Settings</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Power Signal Timeout (minutes)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={config.signalTimeouts?.powerSignalTimeout || 2}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    signalTimeouts: {
+                      ...config.signalTimeouts,
+                      powerSignalTimeout: parseInt(e.target.value) || 2
+                    }
+                  })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Time after which machine is considered inactive if no power signal
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Cycle Signal Timeout (minutes)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={config.signalTimeouts?.cycleSignalTimeout || 2}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    signalTimeouts: {
+                      ...config.signalTimeouts,
+                      cycleSignalTimeout: parseInt(e.target.value) || 2
+                    }
+                  })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Time after which unclassified stoppage is detected if no cycle signal
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() => handleConfigUpdate({ 
+                  signalTimeouts: config.signalTimeouts 
+                })}
+                disabled={saving}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving...' : 'Save Signal Settings'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Shift Management Tab */}
+        {activeTab === 'shifts' && config && (
+          <div className="space-y-6">
+            {/* Add New Shift */}
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5 text-blue-400" />
+                  <h2 className="text-lg font-semibold text-white">Shift Management</h2>
+                </div>
+                <button
+                  onClick={() => {
+                    const newShift = {
+                      name: `Shift ${(config.shifts?.length || 0) + 1}`,
+                      startTime: '08:00',
+                      endTime: '16:00',
+                      isActive: true
+                    };
+                    setConfig({
+                      ...config,
+                      shifts: [...(config.shifts || []), newShift]
+                    });
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Shift</span>
+                </button>
+              </div>
+
+              {config.shifts && config.shifts.length > 0 ? (
+                <div className="space-y-4">
+                  {config.shifts.map((shift, index) => (
+                    <div key={index} className="bg-gray-700 rounded-lg p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Shift Name
+                          </label>
+                          <input
+                            type="text"
+                            value={shift.name}
+                            onChange={(e) => {
+                              const updatedShifts = [...config.shifts];
+                              updatedShifts[index].name = e.target.value;
+                              setConfig({ ...config, shifts: updatedShifts });
+                            }}
+                            className="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            value={shift.startTime}
+                            onChange={(e) => {
+                              const updatedShifts = [...config.shifts];
+                              updatedShifts[index].startTime = e.target.value;
+                              setConfig({ ...config, shifts: updatedShifts });
+                            }}
+                            className="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            End Time
+                          </label>
+                          <input
+                            type="time"
+                            value={shift.endTime}
+                            onChange={(e) => {
+                              const updatedShifts = [...config.shifts];
+                              updatedShifts[index].endTime = e.target.value;
+                              setConfig({ ...config, shifts: updatedShifts });
+                            }}
+                            className="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={shift.isActive}
+                              onChange={(e) => {
+                                const updatedShifts = [...config.shifts];
+                                updatedShifts[index].isActive = e.target.checked;
+                                setConfig({ ...config, shifts: updatedShifts });
+                              }}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            <span className="ml-2 text-sm text-gray-300">Active</span>
+                          </label>
+                          
+                          <button
+                            onClick={() => {
+                              const updatedShifts = config.shifts.filter((_, i) => i !== index);
+                              setConfig({ ...config, shifts: updatedShifts });
+                            }}
+                            className="text-red-400 hover:text-red-300 p-1"
+                            title="Delete shift"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Clock className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">No shifts configured</p>
+                  <p className="text-gray-500 text-sm mt-1">Add your first shift to get started</p>
+                </div>
+              )}
+
+              <div className="mt-6">
+                <button
+                  onClick={() => handleConfigUpdate({ shifts: config.shifts })}
+                  disabled={saving}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>{saving ? 'Saving...' : 'Save Shifts'}</span>
+                </button>
+              </div>
+            </div>
+            
+            {/* Available pins info */}
+            <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+              <p className="text-sm text-gray-300 mb-2">Available pins: {availablePinsForSelection.length}/8</p>
+              <div className="flex flex-wrap gap-1">
+                {availablePinsForSelection.map(pin => (
+                  <span key={pin} className="px-2 py-1 bg-green-600 text-white text-xs rounded">
+                    {pin}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         )}

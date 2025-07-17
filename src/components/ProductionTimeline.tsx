@@ -62,7 +62,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
     duration: 30
   });
   const [assignmentForm, setAssignmentForm] = useState({
-    operatorId: hour.operator?.id || '',
+    operatorId: hour.operator?._id || hour.operator?.id || '',
     moldId: hour.mold?._id || '',
     defectiveUnits: hour.defectiveUnits || 0
   });
@@ -351,7 +351,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                 >
                   <option value="">No operator assigned</option>
                   {availableOperators.map((operator) => (
-                    <option key={operator.id} value={operator.id}>
+                    <option key={operator._id || operator.id} value={operator._id || operator.id}>
                       {operator.username}
                     </option>
                   ))}
@@ -718,7 +718,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       const firstStoppage = hour.stoppages[0];
       switch (firstStoppage.reason) {
         case 'mold_change': return 'bg-purple-500';
-        case 'breakdown': return 'bg-red-700';
+        case 'breakdown': return 'bg-orange-600'; // New color for breakdown
         case 'maintenance': return 'bg-yellow-500';
         case 'planned': return 'bg-blue-500';
         case 'material_shortage': return 'bg-orange-500';
@@ -731,6 +731,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
     if (hour.status === 'running') return 'bg-yellow-500';
     if (hour.status === 'maintenance') return 'bg-blue-500';
     if (hour.status === 'mold_change') return 'bg-purple-500';
+    if (hour.status === 'breakdown') return 'bg-orange-600';
     if (hour.status === 'stopped' || hour.status === 'error') return 'bg-red-500';
     
     return 'bg-gray-600';
@@ -839,6 +840,10 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-red-500 rounded"></div>
             <span className="text-gray-300">Stoppage</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-orange-600 rounded"></div>
+            <span className="text-gray-300">Breakdown</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-red-600 rounded animate-pulse"></div>

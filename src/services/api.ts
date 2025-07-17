@@ -280,6 +280,25 @@ class ApiService {
       method: 'PATCH',
     });
   }
+
+  // Reports
+  async getReports(filters?: any) {
+    const params = new URLSearchParams(filters).toString();
+    return this.request(`/reports${params ? `?${params}` : ''}`);
+  }
+
+  async generateReport(reportData: any) {
+    return this.request('/reports/generate', {
+      method: 'POST',
+      body: JSON.stringify(reportData),
+    });
+  }
+
+  async emailReport(reportId: string) {
+    return this.request(`/reports/${reportId}/email`, {
+      method: 'POST',
+    });
+  }
 }
 
 export default new ApiService();

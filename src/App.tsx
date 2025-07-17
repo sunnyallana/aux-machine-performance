@@ -11,6 +11,7 @@ import Users from './components/Users';
 import Sensors from './components/Sensors';
 import Molds from './components/Molds';
 import Configuration from './components/Configuration';
+import Reports from './components/Reports';
 
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -42,6 +43,7 @@ const App: React.FC = () => {
             <Route path="users" element={<Users/>} />
             <Route path="sensors" element={<Sensors />} />
             <Route path="molds" element={<Molds/>} />
+            <Route path="reports" element={<Reports />} />
             <Route path="config" element={<Configuration />} />
           </Route>
         </Routes>

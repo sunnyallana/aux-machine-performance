@@ -46,9 +46,12 @@ const productionRecordSchema = new mongoose.Schema({
     stoppages: [{
       reason: String,
       description: String,
+      sapNotificationNumber: String, // For breakdown stoppages
       startTime: Date,
       endTime: Date,
-      duration: Number
+      duration: Number,
+      isPending: { type: Boolean, default: false },
+      isClassified: { type: Boolean, default: false }
     }],
     runningMinutes: {
       type: Number,
