@@ -1,0 +1,13 @@
+{
+  "backend": {
+    "url": "http://localhost:3001"
+  },
+  "daemon": {
+    "interval_seconds": 2,
+    "retry_attempts": 3,
+    "retry_delay": 5
+  },
+  "logging": {
+    "level": "INFO"
+  }
+}
