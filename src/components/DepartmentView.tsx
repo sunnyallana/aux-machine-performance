@@ -31,7 +31,7 @@ const DepartmentView: React.FC = () => {
     totalUnits: 0,
     avgOEE: 0,
     runningMachines: 0,
-    stoppedMachines: 0
+    stoppedMachines: 2
   });
   const [loading, setLoading] = useState(true);
   const [isAddingMachine, setIsAddingMachine] = useState(false);
