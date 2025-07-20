@@ -19,13 +19,15 @@ export interface Department {
   updatedAt: string;
 }
 
+export type MachineStatus = 'running' | 'stoppage' | 'stopped_yet_producing' | 'inactive';
+
 export interface Machine {
   _id: string;
   name: string;
   description?: string;
   departmentId: string | Department;
   position: { x: number; y: number };
-  status: 'running' | 'stopped' | 'maintenance' | 'error' | 'breakdown' | 'mold_change' | 'unclassified' | 'inactive';
+  status: MachineStatus;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

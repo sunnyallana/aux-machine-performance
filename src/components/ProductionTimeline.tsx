@@ -148,11 +148,9 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running': return 'text-green-400';
-      case 'stopped': return 'text-red-400';
-      case 'maintenance': return 'text-yellow-400';
-      case 'mold_change': return 'text-blue-400';
-      case 'breakdown': return 'text-red-500';
-      case 'unclassified': return 'text-red-500';
+      case 'stoppage': return 'text-red-400';
+      case 'stopped_yet_producing': return 'text-orange-400';
+      case 'inactive': return 'text-gray-400';
       default: return 'text-gray-400';
     }
   };
@@ -160,11 +158,9 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'running': return <Play className="h-4 w-4" />;
-      case 'stopped': return <Pause className="h-4 w-4" />;
-      case 'maintenance': return <Settings className="h-4 w-4" />;
-      case 'mold_change': return <Package className="h-4 w-4" />;
-      case 'breakdown': return <AlertTriangle className="h-4 w-4" />;
-      case 'unclassified': return <AlertTriangle className="h-4 w-4" />;
+      case 'stoppage': return <AlertTriangle className="h-4 w-4" />;
+      case 'stopped_yet_producing': return <ZapOff className="h-4 w-4" />;
+      case 'inactive': return <Activity className="h-4 w-4" />;
       default: return <Activity className="h-4 w-4" />;
     }
   };
@@ -662,7 +658,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                 newData[dayIndex].hours[hourIndex].stoppages.push(unclassifiedStoppageRecord);
               }
 
-              newData[dayIndex].hours[hourIndex].status = 'unclassified';
+              newData[dayIndex].hours[hourIndex].status = 'stoppage';
               newData[dayIndex].hours[hourIndex].stoppageMinutes = 
                 (newData[dayIndex].hours[hourIndex].stoppageMinutes || 0) + (stoppage.duration || 0);
             }
@@ -706,13 +702,9 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
 
               // Update status based on stoppage reason
               if (stoppage.stoppage.reason === 'breakdown') {
-                newData[dayIndex].hours[hourIndex].status = 'breakdown';
-              } else if (stoppage.stoppage.reason === 'mold_change') {
-                newData[dayIndex].hours[hourIndex].status = 'mold_change';
-              } else if (stoppage.stoppage.reason === 'maintenance') {
-                newData[dayIndex].hours[hourIndex].status = 'maintenance';
+                newData[dayIndex].hours[hourIndex].status = 'stoppage';
               } else {
-                newData[dayIndex].hours[hourIndex].status = 'stopped';
+                newData[dayIndex].hours[hourIndex].status = 'stoppage';
               }
             }
           }
@@ -832,32 +824,20 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   const currentDay = filteredData[selectedDayIndex] || filteredData[0];
 
   const getHourColor = (hour: ProductionHour) => {
-    // Check for unclassified stoppages
-    const hasUnclassifiedStoppage = hour.stoppages.some(s => s.reason === 'unclassified' || (s as any).isPending);
-    if (hasUnclassifiedStoppage) return 'bg-red-600 animate-pulse';
+    // Map to the new 4 states
+    let status: string = 'inactive';
     
-    // Check for categorized stoppages
-    if (hour.stoppages.length > 0) {
-      const firstStoppage = hour.stoppages[0];
-      switch (firstStoppage.reason) {
-        case 'mold_change': return 'bg-purple-500';
-        case 'breakdown': return 'bg-orange-600';
-        case 'maintenance': return 'bg-yellow-500';
-        case 'planned': return 'bg-blue-500';
-        case 'material_shortage': return 'bg-orange-500';
-        case 'other': return 'bg-gray-500';
-      }
+    if (hour.status === 'running') status = 'running';
+    else if (hour.status === 'stoppage') status = 'stoppage';
+    else if (hour.status === 'stopped_yet_producing') status = 'stopped_yet_producing';
+    
+    switch (status) {
+      case 'running': return 'bg-green-500';
+      case 'stoppage': return 'bg-red-600 animate-pulse';
+      case 'stopped_yet_producing': return 'bg-orange-500';
+      case 'inactive': 
+      default: return 'bg-gray-600';
     }
-    
-    // Status-based coloring
-    if (hour.status === 'running') return 'bg-green-500';
-    if (hour.status === 'unclassified') return 'bg-red-600 animate-pulse';
-    if (hour.status === 'maintenance') return 'bg-yellow-500';
-    if (hour.status === 'mold_change') return 'bg-purple-500';
-    if (hour.status === 'breakdown') return 'bg-orange-600';
-    if (hour.status === 'stopped') return 'bg-red-500';
-    
-    return 'bg-gray-600';
   };
 
   const formatTime = (hour: number) => {
@@ -950,11 +930,11 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-red-600 rounded animate-pulse"></div>
-            <span className="text-gray-300">Unclassified</span>
+            <span className="text-gray-300">Stoppage</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-2 h-2 bg-red-500 rounded"></div>
-            <span className="text-gray-300">Stopped</span>
+            <div className="w-2 h-2 bg-orange-500 rounded"></div>
+            <span className="text-gray-300">Stopped Yet Producing</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-gray-500 rounded"></div>
@@ -1030,29 +1010,39 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                       <>
                         {/* Running time visualization */}
                         <div
-                          className="absolute left-0 top-0 h-full bg-green-500"
+                          className="bg-green-500" 
                           style={{ 
-                            width: `${(runningMinutes / 60) * 100}%`,
+                            width: `${((runningMinutes || 0) / 60) * 100}%`,
+                            height: '100%',
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
                             opacity: 0.8
                           }}
                         />
                         
                         {/* Stoppage time visualization */}
                         <div
-                          className={`absolute top-0 h-full ${hasUnclassifiedStoppage ? 'bg-red-600 animate-pulse' : 'bg-red-500'}`}
+                          className={`${hasUnclassifiedStoppage ? 'bg-red-600 animate-pulse' : 'bg-red-500'}`}
                           style={{ 
-                            left: `${(runningMinutes / 60) * 100}%`,
-                            width: `${(stoppageMinutes / 60) * 100}%`,
+                            width: `${((stoppageMinutes || 0) / 60) * 100}%`,
+                            height: '100%',
+                            position: 'absolute',
+                            left: `${((runningMinutes || 0) / 60) * 100}%`,
+                            top: 0,
                             opacity: hasUnclassifiedStoppage ? 1 : 0.8
                           }}
                         />
                         
                         {/* Inactive time (gray) */}
                         <div
-                          className="absolute top-0 h-full bg-gray-500"
+                          className="bg-gray-500" 
                           style={{ 
+                            width: `${((inactiveMinutes || 0) / 60) * 100}%`,
+                            height: '100%',
+                            position: 'absolute',
                             left: `${((runningMinutes + stoppageMinutes) / 60) * 100}%`,
-                            width: `${(inactiveMinutes / 60) * 100}%`,
+                            top: 0,
                             opacity: 0.4
                           }}
                         />

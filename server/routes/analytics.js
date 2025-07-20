@@ -60,9 +60,11 @@ router.get('/production-timeline/:machineId', auth, async (req, res) => {
         const stoppageMinutes = hourData?.stoppageMinutes || 0;
         
         // Determine status based on activity
-        let status = 'stopped';
+        let status = 'inactive';
         if (runningMinutes > 0) {
-          status = stoppageMinutes > runningMinutes ? 'stopped' : 'running';
+          status = stoppageMinutes > runningMinutes ? 'stoppage' : 'running';
+        } else if (stoppageMinutes > 0) {
+          status = 'stoppage';
         }
 
         dayData.hours.push({
@@ -93,8 +95,6 @@ router.post('/stoppage', auth, async (req, res) => {
     const { machineId, hour, date, reason, description, duration, pendingStoppageId, sapNotificationNumber } = req.body;
     const io = req.app.get('io');
     
-    console.log('Received stoppage request:', { machineId, hour, date, reason, description, duration, pendingStoppageId, sapNotificationNumber });
-    
     // Validate SAP notification number for breakdown
     if (reason === 'breakdown' && (!sapNotificationNumber || sapNotificationNumber.trim() === '')) {
       return res.status(400).json({ message: 'SAP notification number is required for breakdown stoppages' });
@@ -103,11 +103,6 @@ router.post('/stoppage', auth, async (req, res) => {
     // Validate SAP notification number format (only numbers)
     if (reason === 'breakdown' && sapNotificationNumber && !/^\d+$/.test(sapNotificationNumber.trim())) {
       return res.status(400).json({ message: 'SAP notification number must contain only numbers' });
-    }
-    
-    // Validate machineId
-    if (!mongoose.Types.ObjectId.isValid(machineId)) {
-      return res.status(400).json({ message: 'Invalid machine ID' });
     }
     
     // Find production record for the specified date
@@ -134,7 +129,7 @@ router.post('/stoppage', auth, async (req, res) => {
         hour,
         unitsProduced: 0,
         defectiveUnits: 0,
-        status: 'stopped',
+        status: 'stoppage',
         runningMinutes: 0,
         stoppageMinutes: 0,
         stoppages: []
@@ -206,13 +201,9 @@ router.post('/stoppage', auth, async (req, res) => {
 
     // Set status based on reason with specific colors
     if (reason === 'breakdown') {
-      hourData.status = 'breakdown';
-    } else if (reason === 'mold_change') {
-      hourData.status = 'mold_change';
-    } else if (reason === 'maintenance') {
-      hourData.status = 'maintenance';
+      hourData.status = 'stoppage';
     } else {
-      hourData.status = 'stopped';
+      hourData.status = 'stoppage';
     }
 
     await productionRecord.save();
@@ -231,7 +222,6 @@ router.post('/stoppage', auth, async (req, res) => {
       timestamp: new Date()
     });
 
-    console.log('Stoppage saved successfully');
     res.status(201).json({ message: 'Stoppage recorded successfully' });
   } catch (error) {
     console.error('Error saving stoppage:', error);
@@ -244,8 +234,6 @@ router.post('/production-assignment', auth, async (req, res) => {
   try {
     const { machineId, hour, date, operatorId, moldId, defectiveUnits } = req.body;
     const io = req.app.get('io');
-    
-    console.log('Received assignment request:', { machineId, hour, date, operatorId, moldId, defectiveUnits });
     
     // Validate and convert operatorId to ObjectId if provided
     let validOperatorId = null;
@@ -299,7 +287,7 @@ router.post('/production-assignment', auth, async (req, res) => {
         hour,
         unitsProduced: 0,
         defectiveUnits: 0,
-        status: 'stopped',
+        status: 'inactive',
         runningMinutes: 0,
         stoppageMinutes: 0,
         stoppages: []
@@ -332,7 +320,6 @@ router.post('/production-assignment', auth, async (req, res) => {
       timestamp: new Date()
     });
 
-    console.log('Assignment saved successfully');
     res.json({ message: 'Production assignment updated successfully' });
   } catch (error) {
     console.error('Error saving assignment:', error);

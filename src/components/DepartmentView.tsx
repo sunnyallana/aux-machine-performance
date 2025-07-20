@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Department, Machine } from '../types';
+import { Department, Machine, MachineStats, MachineStatus } from '../types';
 import apiService from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import socketService from '../services/socket';
@@ -42,13 +42,14 @@ const DepartmentView: React.FC = () => {
   }>({
     name: '',
     description: '',
-    status: 'stopped'
+    status: 'inactive'
   });
   const [editLayoutMode, setEditLayoutMode] = useState(false);
   const [positions, setPositions] = useState<{[key: string]: {x: number; y: number}}>({});
   const [draggingMachineId, setDraggingMachineId] = useState<string | null>(null);
   const [machineStatuses, setMachineStatuses] = useState<{[key: string]: string}>({});
   const layoutContainerRef = useRef<HTMLDivElement>(null);
+  const [machineStats, setMachineStats] = useState<{[machineId: string]: MachineStats}>({});
   const dragOffset = useRef({ x: 0, y: 0 });
   const machinesRef = useRef<Machine[]>([]);
   machinesRef.current = machines;
@@ -180,33 +181,44 @@ const DepartmentView: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: Machine['status']) => {
+  const getStatusColor = (status: MachineStatus) => {
     switch (status) {
       case 'running': return 'bg-green-500';
-      case 'stopped': return 'bg-red-500';
+      case 'stoppage': return 'bg-red-500 animate-pulse';
+      case 'stopped_yet_producing': return 'bg-orange-500';
       case 'inactive': return 'bg-gray-500';
-      case 'unclassified': return 'bg-red-600';
-      case 'maintenance': return 'bg-yellow-500';
-      case 'error': return 'bg-red-600';
-      case 'breakdown': return 'bg-orange-600';
-      case 'mold_change': return 'bg-purple-500';
       default: return 'bg-gray-500';
     }
   };
 
-  const getStatusText = (status: Machine['status']) => {
+  const getStatusText = (status: MachineStatus) => {
     switch (status) {
       case 'running': return 'Running';
-      case 'stopped': return 'Stopped';
+      case 'stoppage': return 'Stoppage';
+      case 'stopped_yet_producing': return 'Stopped Yet Producing';
       case 'inactive': return 'Inactive';
-      case 'unclassified': return 'Unclassified Stoppage';
-      case 'maintenance': return 'Maintenance';
-      case 'error': return 'Error';
-      case 'breakdown': return 'Breakdown';
-      case 'mold_change': return 'Mold Change';
-      default: return 'Unknown';
+      default: return status;
     }
   };
+
+  const fetchMachineStats = async () => {
+    try {
+      const stats: {[machineId: string]: MachineStats} = {};
+      for (const machine of machines) {
+        const machineStats = await apiService.getMachineStats(machine._id, '24h');
+        stats[machine._id] = machineStats;
+      }
+      setMachineStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch machine stats:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (machines.length > 0) {
+      fetchMachineStats();
+    }
+  }, [machines]);
 
   const handleAddMachine = async () => {
     try {
@@ -224,7 +236,7 @@ const DepartmentView: React.FC = () => {
       setNewMachine({
         name: '',
         description: '',
-        status: 'stopped'
+        status: 'inactive'
       });
       toast.success('Machine added successfully');
     } catch (err) {
@@ -485,7 +497,7 @@ const DepartmentView: React.FC = () => {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium text-white truncate">{machine.name}</h3>
                     <div className="flex items-center space-x-2">
-                      <div className={`h-3 w-3 rounded-full ${getStatusColor(machineStatuses[machine._id] || machine.status)}`}></div>
+                      <div className={`h-3 w-3 rounded-full ${getStatusColor(machineStatuses[machine._id] as MachineStatus || machine.status as MachineStatus)}`}></div>
                       {editLayoutMode && (
                         <button
                           onClick={(e) => handleDeleteMachine(machine._id, e)}
@@ -504,34 +516,34 @@ const DepartmentView: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-400">Status</span>
-                      <span className={`font-medium ${
-                        (machineStatuses[machine._id] || machine.status) === 'running' ? 'text-green-400' :
-                        (machineStatuses[machine._id] || machine.status) === 'stopped' || (machineStatuses[machine._id] || machine.status) === 'inactive' ? 'text-red-400' :
-                        (machineStatuses[machine._id] || machine.status) === 'unclassified' ? 'text-red-500 animate-pulse' :
-                        (machineStatuses[machine._id] || machine.status) === 'breakdown' ? 'text-orange-400' :
-                        (machineStatuses[machine._id] || machine.status) === 'mold_change' ? 'text-purple-400' :
-                        (machineStatuses[machine._id] || machine.status) === 'maintenance' ? 'text-yellow-400' :
-                        'text-red-400'
-                      }`}>
-                        {getStatusText(machineStatuses[machine._id] || machine.status)}
+                        <span className={`font-medium ${
+                          (machineStatuses[machine._id] || machine.status) === 'running' 
+                            ? 'text-green-400' :
+                          (machineStatuses[machine._id] || machine.status) === 'stoppage' 
+                            ? 'text-red-400' :
+                          (machineStatuses[machine._id] || machine.status) === 'stopped_yet_producing' 
+                            ? 'text-orange-400' :
+                          'text-gray-400' // inactive
+                        }`}>
+                        {getStatusText(machineStatuses[machine._id] as MachineStatus || machine.status as MachineStatus)}
                       </span>
                     </div>
                     
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-400">OEE</span>
                       <span className="text-white font-medium">
-                        {Math.floor(Math.random() * 30) + 70}%
+                        {machineStats[machine._id]?.oee ?? 'N/A'}%
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">Today's Units</span>
-                      <span className="text-white font-medium">
-                        {Math.floor(Math.random() * 500) + 100}
-                      </span>
-                    </div>
+                   <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Today's Units</span>
+                    <span className="text-white font-medium">
+                      {machineStats[machine._id]?.totalUnitsProduced ?? 'N/A'}
+                    </span>
                   </div>
                 </div>
+              </div>
               ))}
             </div>
           ) : (

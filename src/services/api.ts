@@ -124,10 +124,13 @@ class ApiService {
   }
 
   async deleteMachine(id: string) {
-  return this.request(`/machines/${id}`, {
-    method: 'DELETE',
-  });
-}
+    return this.request(`/machines/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+
+  
 
   // Users
   async getUsers() {

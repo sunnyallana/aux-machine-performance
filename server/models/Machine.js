@@ -21,8 +21,8 @@ const machineSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['running', 'stopped', 'maintenance', 'error'],
-    default: 'stopped'
+    enum: ['running', 'stoppage', 'stopped_yet_producing', 'inactive'],
+    default: 'inactive'
   },
   isActive: {
     type: Boolean,

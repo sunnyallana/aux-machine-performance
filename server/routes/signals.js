@@ -6,6 +6,7 @@ const ProductionRecord = require('../models/ProductionRecord');
 const StoppageRecord = require('../models/StoppageRecord');
 const Config = require('../models/Config');
 const { auth } = require('../middleware/auth');
+const Machine = require('../models/Machine');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ const getSignalTimeouts = async () => {
   try {
     const config = await Config.findOne();
     return {
-      powerTimeout: (config?.signalTimeouts?.powerSignalTimeout || 3) * 60 * 1000, // 5 minutes default
+      powerTimeout: (config?.signalTimeouts?.powerSignalTimeout || 3) * 60 * 1000, // 3 minutes default
       cycleTimeout: (config?.signalTimeouts?.cycleSignalTimeout || 2) * 60 * 1000   // 2 minutes default
     };
   } catch (error) {
@@ -77,14 +78,16 @@ router.post('/pin-data', async (req, res) => {
       
       if (!machine) continue;
 
-      // Store signal data
-      const signalData = new SignalData({
-        sensorId: sensor._id,
-        machineId: machine._id,
-        value: pinValue,
-        timestamp: currentTime
-      });
-      await signalData.save();
+      // UPDATE SIGNAL DATA: Upsert instead of creating new documents
+      await SignalData.findOneAndUpdate(
+        { sensorId: sensor._id },
+        { 
+          machineId: machine._id,
+          value: pinValue,
+          timestamp: currentTime
+        },
+        { upsert: true, new: true }
+      );
 
       if (sensor.sensorType === 'power' && pinValue === 1) {
         machineLastPowerSignal.set(machine._id.toString(), currentTime);
@@ -134,7 +137,6 @@ router.post('/pin-data', async (req, res) => {
 // Update machine states based on power and cycle signals
 async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
   const machinesWithSensors = new Set();
-  const Machine = require('../models/Machine');
   
   // Get all machines with sensors
   pinMappings.forEach(mapping => {
@@ -156,9 +158,9 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
     let machineStatus;
     let statusColor;
     
+    // New 4-state system
     if (hasPower && hasCycle) {
-      // Power signal within 3 minutes and cycle signal within 2 minutes => running
-      machineStatus = 'running_producing';
+      machineStatus = 'running';
       statusColor = 'green';
       
       // Track running minutes
@@ -171,8 +173,7 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
       }
       
     } else if (hasPower && !hasCycle) {
-      // Power signal within 3 minutes but no cycle signal within 2 minutes => unclassified stoppage
-      machineStatus = 'unclassified_stoppage';
+      machineStatus = 'stoppage';
       statusColor = 'red';
       
       // Create pending stoppage if not already exists
@@ -188,13 +189,11 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
       }
       
     } else if (!hasPower && hasCycle) {
-      // No power signal within 3 minutes but cycle signal within 2 minutes => powered off but producing
-      machineStatus = 'powered_off_producing';
+      machineStatus = 'stopped_yet_producing';
       statusColor = 'orange';
       
     } else {
-      // No power signal within 3 minutes and no cycle signal within 2 minutes => powered off
-      machineStatus = 'powered_off';
+      machineStatus = 'inactive';
       statusColor = 'gray';
     }
 
@@ -213,18 +212,7 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
 
     // Update machine status in database
     try {
-      let dbStatus = 'stopped';
-      if (machineStatus === 'running_producing') {
-        dbStatus = 'running';
-      } else if (machineStatus === 'unclassified_stoppage') {
-        dbStatus = 'error';
-      } else if (machineStatus === 'powered_off_producing') {
-        dbStatus = 'maintenance';
-      } else {
-        dbStatus = 'stopped';
-      }
-      
-      await Machine.findByIdAndUpdate(machineId, { status: dbStatus });
+      await Machine.findByIdAndUpdate(machineId, { status: machineStatus });
     } catch (error) {
       console.error('Error updating machine status in database:', error);
     }
@@ -236,9 +224,7 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
       color: statusColor,
       hasPower,
       hasCycle,
-      dbStatus: machineStatus === 'running_producing' ? 'running' : 
-                machineStatus === 'unclassified_stoppage' ? 'error' :
-                machineStatus === 'powered_off_producing' ? 'maintenance' : 'stopped',
+      dbStatus: machineStatus,
       timestamp: currentTime
     });
   }
@@ -330,7 +316,7 @@ async function storeUnclassifiedStoppage(machineId, currentTime, io) {
         hour: currentHour,
         unitsProduced: 0,
         defectiveUnits: 0,
-        status: 'unclassified',
+        status: 'stoppage',
         runningMinutes: 0,
         stoppageMinutes: 0,
         stoppages: []
@@ -354,7 +340,7 @@ async function storeUnclassifiedStoppage(machineId, currentTime, io) {
     const existingIndex = hourData.stoppages.findIndex(s => s.reason === 'unclassified');
     if (existingIndex === -1) {
       hourData.stoppages.push(unclassifiedStoppageRecord);
-      hourData.status = 'unclassified';
+      hourData.status = 'stoppage';
       
       await productionRecord.save();
       
@@ -413,7 +399,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
         hour: currentHour,
         unitsProduced: 0,
         defectiveUnits: 0,
-        status: 'stopped',
+        status: 'stoppage',
         runningMinutes: 0,
         stoppageMinutes: 0,
         stoppages: []
@@ -433,7 +419,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
       isPending: true
     });
 
-    hourData.status = 'unclassified';
+    hourData.status = 'stoppage';
     
     await productionRecord.save();
 
@@ -476,7 +462,7 @@ async function resolvePendingStoppage(machineId, currentTime, io) {
         hourData.status = 'running';
         
         await productionRecord.save();
-        unclassifiedStoppages.delete(machine._id.toString());
+        unclassifiedStoppages.delete(machineId);
       }
     }
 
@@ -589,11 +575,9 @@ async function updateProductionRecord(machineId, currentTime, io) {
 router.get('/machine/:machineId/recent', auth, async (req, res) => {
   try {
     const { machineId } = req.params;
-    const { limit = 100 } = req.query;
-
+    
+    // Return all current signals for the machine (one per sensor)
     const signals = await SignalData.find({ machineId })
-      .sort({ timestamp: -1 })
-      .limit(parseInt(limit))
       .populate('sensorId');
 
     res.json(signals);
@@ -602,20 +586,23 @@ router.get('/machine/:machineId/recent', auth, async (req, res) => {
   }
 });
 
-// Add signal data (legacy endpoint)
+// Add/update signal data
 router.post('/', async (req, res) => {
   try {
     const { sensorId, machineId, value, timestamp } = req.body;
     
-    const signalData = new SignalData({
-      sensorId,
-      machineId,
-      value,
-      timestamp: timestamp ? new Date(timestamp) : new Date()
-    });
+    // Update existing signal or create new if doesn't exist
+    await SignalData.findOneAndUpdate(
+      { sensorId },
+      { 
+        machineId,
+        value,
+        timestamp: timestamp ? new Date(timestamp) : new Date()
+      },
+      { upsert: true, new: true }
+    );
 
-    await signalData.save();
-    res.status(201).json(signalData);
+    res.status(201).json({ message: 'Signal data updated successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
