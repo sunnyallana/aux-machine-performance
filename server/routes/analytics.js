@@ -145,7 +145,7 @@ router.post('/stoppage', auth, async (req, res) => {
     // If this is updating a pending stoppage, find and update it
     if (pendingStoppageId) {
       const stoppageIndex = hourData.stoppages.findIndex(s => 
-        s._id && s._id.toString() === pendingStoppageId
+        (s._id && s._id.toString() === pendingStoppageId) || s.reason === 'unclassified'
       );
       
       if (stoppageIndex >= 0) {
@@ -158,6 +158,7 @@ router.post('/stoppage', auth, async (req, res) => {
         hourData.stoppages[stoppageIndex].isPending = false;
         hourData.stoppages[stoppageIndex].isClassified = true;
         hourData.stoppages[stoppageIndex].endTime = new Date();
+        hourData.stoppages[stoppageIndex].duration = duration;
       } else {
         // If pending stoppage not found, create new one
         const stoppageStart = new Date(`${date}T${hour.toString().padStart(2, '0')}:00:00`);

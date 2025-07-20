@@ -177,13 +177,13 @@ const MachineView: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running': return 'text-green-400 bg-green-400/10 border-green-400/20';
-      case 'running_producing': return 'text-green-400 bg-green-400/10 border-green-400/20';
       case 'stopped': return 'text-red-400 bg-red-400/10 border-red-400/20';
-      case 'powered_off': return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
-      case 'powered_off_producing': return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
-      case 'unclassified_stoppage': return 'text-red-500 bg-red-500/10 border-red-500/20';
+      case 'inactive': return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
+      case 'unclassified': return 'text-red-500 bg-red-500/10 border-red-500/20';
       case 'maintenance': return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
       case 'error': return 'text-red-500 bg-red-500/10 border-red-500/20';
+      case 'breakdown': return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
+      case 'mold_change': return 'text-purple-400 bg-purple-400/10 border-purple-400/20';
       default: return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
     }
   };
@@ -191,13 +191,13 @@ const MachineView: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'running': return <Power className="h-4 w-4" />;
-      case 'running_producing': return <Power className="h-4 w-4" />;
       case 'stopped': return <AlertTriangle className="h-4 w-4" />;
-      case 'powered_off': return <AlertTriangle className="h-4 w-4" />;
-      case 'powered_off_producing': return <Activity className="h-4 w-4" />;
-      case 'unclassified_stoppage': return <AlertTriangle className="h-4 w-4" />;
+      case 'inactive': return <AlertTriangle className="h-4 w-4" />;
+      case 'unclassified': return <AlertTriangle className="h-4 w-4" />;
       case 'maintenance': return <Settings className="h-4 w-4" />;
       case 'error': return <AlertTriangle className="h-4 w-4" />;
+      case 'breakdown': return <AlertTriangle className="h-4 w-4" />;
+      case 'mold_change': return <Settings className="h-4 w-4" />;
       default: return <Activity className="h-4 w-4" />;
     }
   };

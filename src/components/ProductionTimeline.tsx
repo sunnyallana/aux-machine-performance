@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ProductionTimelineDay, ProductionHour, StoppageRecord, User, Mold } from '../types';
-import { format, parseISO, startOfDay, endOfDay, isToday, isThisWeek, isThisMonth, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
+import { format, parseISO, isToday } from 'date-fns';
 import socketService from '../services/socket';
 import apiService from '../services/api';
 import { 
@@ -69,7 +69,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   });
 
   // Check for pending stoppages
-  const pendingStoppage = hour.stoppages.find(s => s.reason === 'undefined');
+  const pendingStoppage = hour.stoppages.find(s => s.reason === 'unclassified' || (s as any).isPending);
 
   useEffect(() => {
     if (pendingStoppage) {
@@ -137,11 +137,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       });
       
       toast.success('Assignment updated successfully');
-      // Don't close modal immediately, let parent component handle refresh
-      setTimeout(() => {
-        onClose();
-        window.location.reload();
-      }, 500);
+      onClose();
       
     } catch (error) {
       console.error('Failed to update assignment:', error);
@@ -156,6 +152,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       case 'maintenance': return 'text-yellow-400';
       case 'mold_change': return 'text-blue-400';
       case 'breakdown': return 'text-red-500';
+      case 'unclassified': return 'text-red-500';
       default: return 'text-gray-400';
     }
   };
@@ -167,6 +164,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       case 'maintenance': return <Settings className="h-4 w-4" />;
       case 'mold_change': return <Package className="h-4 w-4" />;
       case 'breakdown': return <AlertTriangle className="h-4 w-4" />;
+      case 'unclassified': return <AlertTriangle className="h-4 w-4" />;
       default: return <Activity className="h-4 w-4" />;
     }
   };
@@ -179,7 +177,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
             Production Details - {format(parseISO(date), 'MMM dd')}, {hour.hour.toString().padStart(2, '0')}:00
             {pendingStoppage && (
               <span className="ml-2 text-red-400 text-sm animate-pulse">
-                (Stoppage Detected - Needs Categorization)
+                (Unclassified Stoppage - Needs Categorization)
               </span>
             )}
           </h3>
@@ -263,7 +261,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
               {/* Time Distribution */}
               <div className="bg-gray-700 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-white mb-3">Time Distribution</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="text-center">
                     <div className="text-lg font-bold text-green-400">{hour.runningMinutes || 0}m</div>
                     <div className="text-xs text-gray-400">Running Time</div>
@@ -271,6 +269,10 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                   <div className="text-center">
                     <div className="text-lg font-bold text-red-400">{hour.stoppageMinutes || 0}m</div>
                     <div className="text-xs text-gray-400">Stoppage Time</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-gray-400">{60 - (hour.runningMinutes || 0) - (hour.stoppageMinutes || 0)}m</div>
+                    <div className="text-xs text-gray-400">Inactive Time</div>
                   </div>
                 </div>
                 
@@ -284,6 +286,10 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                     <div 
                       className="bg-red-500" 
                       style={{ width: `${((hour.stoppageMinutes || 0) / 60) * 100}%` }}
+                    ></div>
+                    <div 
+                      className="bg-gray-500" 
+                      style={{ width: `${((60 - (hour.runningMinutes || 0) - (hour.stoppageMinutes || 0)) / 60) * 100}%` }}
                     ></div>
                   </div>
                 </div>
@@ -321,19 +327,19 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                   <div className="space-y-3">
                     {hour.stoppages.map((stoppage, index) => (
                       <div key={index} className={`rounded-lg p-3 ${
-                        stoppage.reason === 'undefined' || (stoppage as any).isPending 
+                        stoppage.reason === 'unclassified' || (stoppage as any).isPending 
                           ? 'bg-red-900/30 border border-red-500 animate-pulse' 
                           : 'bg-gray-600'
                       }`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-2">
                             <AlertTriangle className={`h-4 w-4 ${
-                              stoppage.reason === 'undefined' || (stoppage as any).isPending 
+                              stoppage.reason === 'unclassified' || (stoppage as any).isPending 
                                 ? 'text-red-400' 
                                 : 'text-red-400'
                             }`} />
                             <span className="text-sm font-medium text-white capitalize">
-                              {stoppage.reason === 'undefined' ? 'Pending Categorization' : stoppage.reason.replace('_', ' ')}
+                              {stoppage.reason === 'unclassified' ? 'Pending Categorization' : stoppage.reason.replace('_', ' ')}
                             </span>
                           </div>
                           <span className="text-xs text-gray-400">
@@ -343,7 +349,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                         {stoppage.description && (
                           <p className="text-xs text-gray-300 ml-6">{stoppage.description}</p>
                         )}
-                        {(stoppage.reason === 'undefined' || (stoppage as any).isPending) && (
+                        {(stoppage.reason === 'unclassified' || (stoppage as any).isPending) && (
                           <p className="text-xs text-red-300 ml-6 mt-1">
                             Click "Categorize Stoppage" tab to assign a reason
                           </p>
@@ -433,10 +439,10 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                 <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <AlertTriangle className="h-5 w-5 text-red-400" />
-                    <h4 className="text-red-400 font-medium">Stoppage Detected</h4>
+                    <h4 className="text-red-400 font-medium">Unclassified Stoppage Detected</h4>
                   </div>
                   <p className="text-red-300 text-sm">
-                    A stoppage was automatically detected for {pendingStoppage.duration} minutes. 
+                    An unclassified stoppage was automatically detected for {pendingStoppage.duration} minutes. 
                     Please categorize the reason for this stoppage.
                   </p>
                 </div>
@@ -548,7 +554,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   const [availableOperators, setAvailableOperators] = useState<User[]>([]);
   const [availableMolds, setAvailableMolds] = useState<Mold[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [machineStatus, setMachineStatus] = useState<string>('powered_off');
+  const [machineStatus, setMachineStatus] = useState<string>('inactive');
   const [machineColor, setMachineColor] = useState<string>('gray');
 
   // Update current time every minute
@@ -559,7 +565,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
     
     return () => clearInterval(timer);
   }, []);
-
 
   // Update data when props change
   useEffect(() => {
@@ -628,7 +633,8 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
         setMachineColor(update.color);
       }
     };
-    const handlePendingStoppageDetected = (stoppage: any) => {
+
+    const handleUnclassifiedStoppageDetected = (stoppage: any) => {
       if (stoppage.machineId === machineId) {
         setData(prevData => {
           const newData = [...prevData];
@@ -637,28 +643,28 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           if (dayIndex >= 0) {
             const hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === stoppage.hour);
             if (hourIndex >= 0) {
-              // Add pending stoppage
-              const pendingStoppageRecord: StoppageRecord = {
-                _id: stoppage.pendingStoppageId,
-                reason: 'undefined',  // Explicitly type as allowed value
+              // Add unclassified stoppage
+              const unclassifiedStoppageRecord: StoppageRecord = {
+                _id: stoppage.pendingStoppageId || `unclassified_${Date.now()}`,
+                reason: 'unclassified',
                 description: 'Automatic stoppage detection - awaiting categorization',
                 startTime: stoppage.stoppageStart,
                 endTime: null,
-                duration: stoppage.duration
+                duration: stoppage.duration || 0
               };
 
-              // Check if this pending stoppage already exists
+              // Check if this unclassified stoppage already exists
               const existingIndex = newData[dayIndex].hours[hourIndex].stoppages.findIndex(
-                s => s._id === stoppage.pendingStoppageId
+                s => s._id === stoppage.pendingStoppageId || s.reason === 'unclassified'
               );
 
               if (existingIndex === -1) {
-                newData[dayIndex].hours[hourIndex].stoppages.push(pendingStoppageRecord);
+                newData[dayIndex].hours[hourIndex].stoppages.push(unclassifiedStoppageRecord);
               }
 
-              newData[dayIndex].hours[hourIndex].status = 'unclassified_stoppage';
+              newData[dayIndex].hours[hourIndex].status = 'unclassified';
               newData[dayIndex].hours[hourIndex].stoppageMinutes = 
-                (newData[dayIndex].hours[hourIndex].stoppageMinutes || 0) + stoppage.duration;
+                (newData[dayIndex].hours[hourIndex].stoppageMinutes || 0) + (stoppage.duration || 0);
             }
           }
           
@@ -674,31 +680,99 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       }
     };
 
-
     const handleStoppageAdded = (stoppage: any) => {
       if (stoppage.machineId === machineId) {
-        // Refresh data to get updated stoppages
-        window.location.reload(); // Simple refresh for now
+        // Update the timeline data in real-time
+        setData(prevData => {
+          const newData = [...prevData];
+          const dayIndex = newData.findIndex(day => day.date === stoppage.date);
+          
+          if (dayIndex >= 0) {
+            const hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === stoppage.hour);
+            if (hourIndex >= 0) {
+              // Remove any unclassified stoppages and add the new classified one
+              newData[dayIndex].hours[hourIndex].stoppages = 
+                newData[dayIndex].hours[hourIndex].stoppages.filter(s => s.reason !== 'unclassified');
+              
+              // Add the new stoppage
+              newData[dayIndex].hours[hourIndex].stoppages.push({
+                _id: `stoppage_${Date.now()}`,
+                reason: stoppage.stoppage.reason as any,
+                description: stoppage.stoppage.description,
+                startTime: new Date().toISOString(),
+                endTime: null,
+                duration: stoppage.stoppage.duration
+              });
+
+              // Update status based on stoppage reason
+              if (stoppage.stoppage.reason === 'breakdown') {
+                newData[dayIndex].hours[hourIndex].status = 'breakdown';
+              } else if (stoppage.stoppage.reason === 'mold_change') {
+                newData[dayIndex].hours[hourIndex].status = 'mold_change';
+              } else if (stoppage.stoppage.reason === 'maintenance') {
+                newData[dayIndex].hours[hourIndex].status = 'maintenance';
+              } else {
+                newData[dayIndex].hours[hourIndex].status = 'stopped';
+              }
+            }
+          }
+          
+          return newData;
+        });
+      }
+    };
+
+    const handleProductionAssignmentUpdated = (update: any) => {
+      if (update.machineId === machineId) {
+        setData(prevData => {
+          const newData = [...prevData];
+          const dayIndex = newData.findIndex(day => day.date === update.date);
+          
+          if (dayIndex >= 0) {
+            const hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === update.hour);
+            if (hourIndex >= 0) {
+              if (update.operatorId) {
+                const operator = availableOperators.find(op => op._id === update.operatorId || op.id === update.operatorId);
+                if (operator) {
+                  newData[dayIndex].hours[hourIndex].operator = operator;
+                }
+              }
+              
+              if (update.moldId) {
+                const mold = availableMolds.find(m => m._id === update.moldId);
+                if (mold) {
+                  newData[dayIndex].hours[hourIndex].mold = mold;
+                }
+              }
+              
+              if (update.defectiveUnits !== undefined) {
+                newData[dayIndex].hours[hourIndex].defectiveUnits = update.defectiveUnits;
+              }
+            }
+          }
+          
+          return newData;
+        });
       }
     };
 
     socketService.on('production-update', handleProductionUpdate);
     socketService.on('running-time-update', handleRunningTimeUpdate);
     socketService.on('machine-state-update', handleMachineStateUpdate);
-    socketService.on('pending-stoppage-detected', handlePendingStoppageDetected);
+    socketService.on('unclassified-stoppage-detected', handleUnclassifiedStoppageDetected);
     socketService.on('stoppage-added', handleStoppageAdded);
-    socketService.on('production-assignment-updated', handleProductionUpdate);
+    socketService.on('production-assignment-updated', handleProductionAssignmentUpdated);
 
     return () => {
       socketService.off('production-update', handleProductionUpdate);
       socketService.off('running-time-update', handleRunningTimeUpdate);
       socketService.off('machine-state-update', handleMachineStateUpdate);
-      socketService.off('pending-stoppage-detected', handlePendingStoppageDetected);
+      socketService.off('unclassified-stoppage-detected', handleUnclassifiedStoppageDetected);
       socketService.off('stoppage-added', handleStoppageAdded);
-      socketService.off('production-assignment-updated', handleProductionUpdate);
+      socketService.off('production-assignment-updated', handleProductionAssignmentUpdated);
       socketService.leaveMachine(machineId);
     };
-  }, [machineId]);
+  }, [machineId, availableOperators, availableMolds]);
 
   // Fetch operators and molds
   useEffect(() => {
@@ -758,16 +832,16 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   const currentDay = filteredData[selectedDayIndex] || filteredData[0];
 
   const getHourColor = (hour: ProductionHour) => {
-    // Check for pending stoppages
-    const hasPendingStoppage = hour.stoppages.some(s => s.reason === 'undefined' || (s as any).isPending);
-    if (hasPendingStoppage) return 'bg-red-600 animate-pulse';
+    // Check for unclassified stoppages
+    const hasUnclassifiedStoppage = hour.stoppages.some(s => s.reason === 'unclassified' || (s as any).isPending);
+    if (hasUnclassifiedStoppage) return 'bg-red-600 animate-pulse';
     
     // Check for categorized stoppages
     if (hour.stoppages.length > 0) {
       const firstStoppage = hour.stoppages[0];
       switch (firstStoppage.reason) {
         case 'mold_change': return 'bg-purple-500';
-        case 'breakdown': return 'bg-orange-600'; // New color for breakdown
+        case 'breakdown': return 'bg-orange-600';
         case 'maintenance': return 'bg-yellow-500';
         case 'planned': return 'bg-blue-500';
         case 'material_shortage': return 'bg-orange-500';
@@ -775,30 +849,19 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       }
     }
     
-    // Status-based coloring according to new requirements
-    if (hour.status === 'running' || hour.status === 'running_producing') return 'bg-green-500';
-    if (hour.status === 'unclassified_stoppage') return 'bg-red-600 animate-pulse';
-    if (hour.status === 'powered_off_producing') return 'bg-orange-500';
-    if (hour.status === 'powered_off') return 'bg-gray-500';
-    if (hour.status === 'maintenance') return 'bg-blue-500';
+    // Status-based coloring
+    if (hour.status === 'running') return 'bg-green-500';
+    if (hour.status === 'unclassified') return 'bg-red-600 animate-pulse';
+    if (hour.status === 'maintenance') return 'bg-yellow-500';
     if (hour.status === 'mold_change') return 'bg-purple-500';
     if (hour.status === 'breakdown') return 'bg-orange-600';
-    if (hour.status === 'stopped' || hour.status === 'error') return 'bg-gray-500';
+    if (hour.status === 'stopped') return 'bg-red-500';
     
     return 'bg-gray-600';
   };
 
-  const getHourIntensity = (hour: ProductionHour, maxUnits: number) => {
-    if (maxUnits === 0) return 0.3;
-    return Math.max(0.3, (hour.unitsProduced / maxUnits));
-  };
-
   const formatTime = (hour: number) => {
     return `${hour.toString().padStart(2, '0')}:00`;
-  };
-
-  const getMaxUnitsForDay = (day: ProductionTimelineDay) => {
-    return Math.max(...day.hours.map(h => h.unitsProduced), 1);
   };
 
   if (!data || data.length === 0) {
@@ -818,8 +881,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       </div>
     );
   }
-
-  const maxUnits = getMaxUnitsForDay(currentDay);
 
   return (
     <div className="space-y-4">
@@ -881,7 +942,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           </span>
         </div>
 
-
         {/* Legend */}
         <div className="flex items-center space-x-3 text-xs">
           <div className="flex items-center space-x-1">
@@ -893,8 +953,8 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
             <span className="text-gray-300">Unclassified</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-2 h-2 bg-orange-500 rounded"></div>
-            <span className="text-gray-300">Powered Off</span>
+            <div className="w-2 h-2 bg-red-500 rounded"></div>
+            <span className="text-gray-300">Stopped</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-gray-500 rounded"></div>
@@ -948,7 +1008,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
         {/* Production Blocks */}
         <div className="flex gap-1 mb-3">
           {currentDay.hours.map((hour) => {
-            const hasPendingStoppage = hour.stoppages.some(s => s.reason === 'undefined');
+            const hasUnclassifiedStoppage = hour.stoppages.some(s => s.reason === 'unclassified');
             
             return (
               <div
@@ -958,22 +1018,13 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
               >
                 {/* Main production block with time-based visualization */}
                 <div className={`h-12 rounded transition-all duration-200 group-hover:scale-105 border relative overflow-hidden ${
-                  hasPendingStoppage ? 'border-red-500 border-2' : 'border-gray-600'
+                  hasUnclassifiedStoppage ? 'border-red-500 border-2' : 'border-gray-600'
                 }`}>
-                  {/* Time-based visualization */}
+                  {/* Time-based visualization with proper inactive time */}
                   {(() => {
-                    const currentTime = new Date();
-                    const hourDate = new Date(currentDay.date);
-                    hourDate.setHours(hour.hour, 0, 0, 0);
-                    const hourEndDate = new Date(hourDate);
-                    hourEndDate.setHours(hour.hour + 1, 0, 0, 0);
-                    
-                    const isCurrentHour = currentTime >= hourDate && currentTime < hourEndDate;
-                    const minutesIntoHour = isCurrentHour ? currentTime.getMinutes() : 60;
-                    
-                    // Calculate running time segments
                     const runningMinutes = hour.runningMinutes || 0;
                     const stoppageMinutes = hour.stoppageMinutes || 0;
+                    const inactiveMinutes = 60 - runningMinutes - stoppageMinutes;
                     
                     return (
                       <>
@@ -988,21 +1039,21 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                         
                         {/* Stoppage time visualization */}
                         <div
-                          className={`absolute top-0 h-full ${hasPendingStoppage ? 'bg-red-600 animate-pulse' : 'bg-red-500'}`}
+                          className={`absolute top-0 h-full ${hasUnclassifiedStoppage ? 'bg-red-600 animate-pulse' : 'bg-red-500'}`}
                           style={{ 
                             left: `${(runningMinutes / 60) * 100}%`,
                             width: `${(stoppageMinutes / 60) * 100}%`,
-                            opacity: hasPendingStoppage ? 1 : 0.8
+                            opacity: hasUnclassifiedStoppage ? 1 : 0.8
                           }}
                         />
                         
-                        {/* Remaining time (gray) */}
+                        {/* Inactive time (gray) */}
                         <div
-                          className="absolute top-0 h-full bg-gray-600"
+                          className="absolute top-0 h-full bg-gray-500"
                           style={{ 
                             left: `${((runningMinutes + stoppageMinutes) / 60) * 100}%`,
-                            width: `${((60 - runningMinutes - stoppageMinutes) / 60) * 100}%`,
-                            opacity: 0.3
+                            width: `${(inactiveMinutes / 60) * 100}%`,
+                            opacity: 0.4
                           }}
                         />
                       </>
@@ -1039,13 +1090,13 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                     {/* Stoppage indicator */}
                     {hour.stoppages.length > 0 && (
                       <div className={`w-2 h-2 rounded-full ${
-                        hasPendingStoppage ? 'bg-red-600 animate-pulse' : 'bg-red-600'
+                        hasUnclassifiedStoppage ? 'bg-red-600 animate-pulse' : 'bg-red-600'
                       }`} title={`${hour.stoppages.length} stoppages`} />
                     )}
                   </div>
 
-                  {/* Pending stoppage overlay */}
-                  {hasPendingStoppage && (
+                  {/* Unclassified stoppage overlay */}
+                  {hasUnclassifiedStoppage && (
                     <div className="absolute inset-0 bg-red-600 bg-opacity-20 animate-pulse border-2 border-red-500 rounded">
                       <div className="absolute inset-0 flex items-center justify-center">
                         <AlertTriangle className="h-4 w-4 text-red-400 animate-bounce" />
@@ -1064,6 +1115,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                     )}
                     <div>Running: <span className="text-green-400">{hour.runningMinutes || 0}m</span></div>
                     <div>Stoppage: <span className="text-red-400">{hour.stoppageMinutes || 0}m</span></div>
+                    <div>Inactive: <span className="text-gray-400">{60 - (hour.runningMinutes || 0) - (hour.stoppageMinutes || 0)}m</span></div>
                     {hour.operator && (
                       <div>Op: <span className="text-blue-400">{hour.operator.username}</span></div>
                     )}
@@ -1073,7 +1125,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                     <div>Status: <span className="capitalize">{hour.status.replace('_', ' ')}</span></div>
                     {hour.stoppages.length > 0 && (
                       <div className="text-red-400">
-                        {hasPendingStoppage && ' (PENDING)'}
+                        {hasUnclassifiedStoppage && ' (UNCLASSIFIED)'}
                         {hour.stoppages.length} stoppage{hour.stoppages.length > 1 ? 's' : ''}
                       </div>
                     )}

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { ThemeContext } from '../App';
 import { Department, MachineStats } from '../types';
 import apiService from '../services/api';
+import socketService from '../services/socket';
 import { 
   Building2, 
   Activity, 
@@ -16,6 +17,12 @@ import {
 
 const Dashboard: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [factoryStats, setFactoryStats] = useState({
+    totalUnits: 0,
+    avgOEE: 0,
+    unclassifiedStoppages: 0,
+    activeMachines: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user, isOperator } = useAuth();
@@ -24,7 +31,37 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDepartments();
+    fetchFactoryStats();
+    setupSocketListeners();
   }, []);
+
+  const setupSocketListeners = () => {
+    socketService.connect();
+
+    const handleProductionUpdate = () => {
+      fetchFactoryStats();
+    };
+
+    const handleStoppageUpdate = () => {
+      fetchFactoryStats();
+    };
+
+    const handleMachineStateUpdate = () => {
+      fetchFactoryStats();
+    };
+
+    socketService.on('production-update', handleProductionUpdate);
+    socketService.on('stoppage-added', handleStoppageUpdate);
+    socketService.on('unclassified-stoppage-detected', handleStoppageUpdate);
+    socketService.on('machine-state-update', handleMachineStateUpdate);
+
+    return () => {
+      socketService.off('production-update', handleProductionUpdate);
+      socketService.off('stoppage-added', handleStoppageUpdate);
+      socketService.off('unclassified-stoppage-detected', handleStoppageUpdate);
+      socketService.off('machine-state-update', handleMachineStateUpdate);
+    };
+  };
 
   const fetchDepartments = async () => {
     try {
@@ -34,6 +71,50 @@ const Dashboard: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to fetch departments');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFactoryStats = async () => {
+    try {
+      // Get all machines and their stats
+      const machines = await apiService.getMachines();
+      let totalUnits = 0;
+      let totalOEE = 0;
+      let activeMachines = 0;
+
+      // Get stats for each machine
+      const statsPromises = machines.map((machine: any) => 
+        apiService.getMachineStats(machine._id, '24h').catch(() => null)
+      );
+      
+      const allStats = await Promise.all(statsPromises);
+      
+      allStats.forEach((stats, index) => {
+        if (stats) {
+          totalUnits += stats.totalUnitsProduced;
+          totalOEE += stats.oee;
+          if (machines[index].status === 'running') {
+            activeMachines++;
+          }
+        }
+      });
+
+      // Get unclassified stoppages count
+      const unclassifiedResponse = await fetch('http://localhost:3001/api/signals/unclassified-stoppages-count', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const unclassifiedData = await unclassifiedResponse.json();
+
+      setFactoryStats({
+        totalUnits,
+        avgOEE: machines.length > 0 ? Math.round(totalOEE / machines.length) : 0,
+        unclassifiedStoppages: unclassifiedData.count || 0,
+        activeMachines
+      });
+    } catch (err) {
+      console.error('Failed to fetch factory stats:', err);
     }
   };
 
@@ -130,7 +211,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Avg OEE</p>
-              <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>78%</p>
+              <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{factoryStats.avgOEE}%</p>
             </div>
           </div>
         </div>
@@ -145,8 +226,10 @@ const Dashboard: React.FC = () => {
               <AlertTriangle className="h-6 w-6 text-white" />
             </div>
             <div className="ml-4">
-              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Active Alerts</p>
-              <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>3</p>
+              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Unclassified Stoppages</p>
+              <p className={`text-2xl font-semibold ${factoryStats.unclassifiedStoppages > 0 ? 'text-red-400 animate-pulse' : (isDarkMode ? 'text-white' : 'text-gray-900')}`}>
+                {factoryStats.unclassifiedStoppages}
+              </p>
             </div>
           </div>
         </div>

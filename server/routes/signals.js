@@ -16,22 +16,23 @@ const machineLastPowerSignal = new Map();
 const machineStates = new Map(); // Track machine states
 const pendingStoppages = new Map(); // Track machines with pending stoppages
 const machineRunningMinutes = new Map(); // Track running minutes per machine
+const unclassifiedStoppages = new Map(); // Track unclassified stoppages
 
 // Get configuration for timeouts
 const getSignalTimeouts = async () => {
   try {
     const config = await Config.findOne();
     return {
-      powerTimeout: (config?.signalTimeouts?.powerSignalTimeout || 5) * 60 * 1000, // 5 minutes default
+      powerTimeout: (config?.signalTimeouts?.powerSignalTimeout || 3) * 60 * 1000, // 5 minutes default
       cycleTimeout: (config?.signalTimeouts?.cycleSignalTimeout || 2) * 60 * 1000   // 2 minutes default
     };
   } catch (error) {
     console.error('Error getting signal timeouts:', error);
-    return { powerTimeout: 5 * 60 * 1000, cycleTimeout: 2 * 60 * 1000 };
+    return { powerTimeout: 3 * 60 * 1000, cycleTimeout: 2 * 60 * 1000 };
   }
 };
 
-// Process pin data from Python daemon
+// Process pin data from daemon
 router.post('/pin-data', async (req, res) => {
   try {
     const { pinData, timestamp } = req.body;
@@ -156,7 +157,7 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
     let statusColor;
     
     if (hasPower && hasCycle) {
-      // Power signal within 5 minutes and cycle signal within 2 minutes => running
+      // Power signal within 3 minutes and cycle signal within 2 minutes => running
       machineStatus = 'running_producing';
       statusColor = 'green';
       
@@ -170,7 +171,7 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
       }
       
     } else if (hasPower && !hasCycle) {
-      // Power signal within 5 minutes but no cycle signal within 2 minutes => unclassified stoppage
+      // Power signal within 3 minutes but no cycle signal within 2 minutes => unclassified stoppage
       machineStatus = 'unclassified_stoppage';
       statusColor = 'red';
       
@@ -181,15 +182,18 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
           startTime: currentTime,
           detectedAt: currentTime
         });
+        
+        // Store unclassified stoppage in database
+        await storeUnclassifiedStoppage(machineId, currentTime, io);
       }
       
     } else if (!hasPower && hasCycle) {
-      // No power signal within 5 minutes but cycle signal within 2 minutes => powered off but producing
+      // No power signal within 3 minutes but cycle signal within 2 minutes => powered off but producing
       machineStatus = 'powered_off_producing';
       statusColor = 'orange';
       
     } else {
-      // No power signal within 5 minutes and no cycle signal within 2 minutes => powered off
+      // No power signal within 3 minutes and no cycle signal within 2 minutes => powered off
       machineStatus = 'powered_off';
       statusColor = 'gray';
     }
@@ -297,6 +301,89 @@ async function updateRunningMinutes(machineId, currentTime, io) {
   }
 }
 
+async function storeUnclassifiedStoppage(machineId, currentTime, io) {
+  try {
+    const currentHour = currentTime.getHours();
+    const currentDate = currentTime.toISOString().split('T')[0];
+    
+    // Find production record
+    let productionRecord = await ProductionRecord.findOne({
+      machineId,
+      startTime: {
+        $gte: new Date(currentDate + 'T00:00:00.000Z'),
+        $lt: new Date(currentDate + 'T23:59:59.999Z')
+      }
+    });
+
+    if (!productionRecord) {
+      productionRecord = new ProductionRecord({
+        machineId,
+        startTime: new Date(currentDate + 'T00:00:00.000Z'),
+        hourlyData: []
+      });
+    }
+
+    // Find or create hourly data
+    let hourData = productionRecord.hourlyData.find(h => h.hour === currentHour);
+    if (!hourData) {
+      hourData = {
+        hour: currentHour,
+        unitsProduced: 0,
+        defectiveUnits: 0,
+        status: 'unclassified',
+        runningMinutes: 0,
+        stoppageMinutes: 0,
+        stoppages: []
+      };
+      productionRecord.hourlyData.push(hourData);
+    }
+
+    // Add unclassified stoppage record
+    const unclassifiedStoppageId = `unclassified_${machineId}_${Date.now()}`;
+    const unclassifiedStoppageRecord = {
+      _id: unclassifiedStoppageId,
+      reason: 'unclassified',
+      description: 'Automatic stoppage detection - awaiting categorization',
+      startTime: currentTime,
+      endTime: null,
+      duration: 0,
+      isPending: true
+    };
+
+    // Check if unclassified stoppage already exists
+    const existingIndex = hourData.stoppages.findIndex(s => s.reason === 'unclassified');
+    if (existingIndex === -1) {
+      hourData.stoppages.push(unclassifiedStoppageRecord);
+      hourData.status = 'unclassified';
+      
+      await productionRecord.save();
+      
+      // Store in memory for tracking
+      unclassifiedStoppages.set(machineId, {
+        id: unclassifiedStoppageId,
+        startTime: currentTime,
+        hour: currentHour,
+        date: currentDate
+      });
+
+      // Emit socket event for unclassified stoppage
+      io.emit('unclassified-stoppage-detected', {
+        machineId: machineId.toString(),
+        hour: currentHour,
+        date: currentDate,
+        stoppageStart: currentTime,
+        pendingStoppageId: unclassifiedStoppageId,
+        timestamp: currentTime
+      });
+
+      console.log(`Stored unclassified stoppage for machine ${machineId}`);
+    }
+
+  } catch (error) {
+    console.error('Error storing unclassified stoppage:', error);
+  }
+}
+
 async function createPendingStoppage(machineId, currentTime, io) {
   try {
     const currentHour = currentTime.getHours();
@@ -338,7 +425,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
     const pendingStoppageId = `pending_${Date.now()}`;
     hourData.stoppages.push({
       _id: pendingStoppageId,
-      reason: 'undefined',
+      reason: 'unclassified',
       description: 'Automatic stoppage detection - awaiting categorization',
       startTime: currentTime,
       endTime: null,
@@ -346,12 +433,12 @@ async function createPendingStoppage(machineId, currentTime, io) {
       isPending: true
     });
 
-    hourData.status = 'unclassified_stoppage';
+    hourData.status = 'unclassified';
     
     await productionRecord.save();
 
     // Emit socket event for pending stoppage
-    io.emit('pending-stoppage-detected', {
+    io.emit('unclassified-stoppage-detected', {
       machineId: machineId.toString(),
       hour: currentHour,
       date: currentDate,
@@ -360,7 +447,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
       timestamp: currentTime
     });
 
-    console.log(`Detected unclassified stoppage for machine ${machineId}`);
+    console.log(`Created pending stoppage for machine ${machineId}`);
 
   } catch (error) {
     console.error('Error creating pending stoppage:', error);
@@ -385,10 +472,11 @@ async function resolvePendingStoppage(machineId, currentTime, io) {
       const hourData = productionRecord.hourlyData.find(h => h.hour === currentHour);
       if (hourData) {
         // Find and remove pending stoppages
-        hourData.stoppages = hourData.stoppages.filter(s => s.reason !== 'undefined');
+        hourData.stoppages = hourData.stoppages.filter(s => s.reason !== 'unclassified');
         hourData.status = 'running';
         
         await productionRecord.save();
+        unclassifiedStoppages.delete(machine._id.toString());
       }
     }
 
@@ -402,6 +490,32 @@ async function resolvePendingStoppage(machineId, currentTime, io) {
     console.error('Error resolving pending stoppage:', error);
   }
 }
+
+// Get unclassified stoppages count for dashboard
+router.get('/unclassified-stoppages-count', async (req, res) => {
+  try {
+    const count = await ProductionRecord.aggregate([
+      {
+        $unwind: '$hourlyData'
+      },
+      {
+        $unwind: '$hourlyData.stoppages'
+      },
+      {
+        $match: {
+          'hourlyData.stoppages.reason': 'unclassified'
+        }
+      },
+      {
+        $count: 'total'
+      }
+    ]);
+    
+    res.json({ count: count[0]?.total || 0 });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 
 async function updateProductionRecord(machineId, currentTime, io) {
   try {

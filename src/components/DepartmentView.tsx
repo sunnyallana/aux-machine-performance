@@ -27,12 +27,18 @@ const DepartmentView: React.FC = () => {
   const { isAdmin } = useAuth();
   const [department, setDepartment] = useState<Department | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [departmentStats, setDepartmentStats] = useState({
+    totalUnits: 0,
+    avgOEE: 0,
+    runningMachines: 0,
+    stoppedMachines: 0
+  });
   const [loading, setLoading] = useState(true);
   const [isAddingMachine, setIsAddingMachine] = useState(false);
   const [newMachine, setNewMachine] = useState<{
-  name: string;
-  description: string;
-  status: Machine['status'];
+    name: string;
+    description: string;
+    status: Machine['status'];
   }>({
     name: '',
     description: '',
@@ -44,25 +50,32 @@ const DepartmentView: React.FC = () => {
   const [machineStatuses, setMachineStatuses] = useState<{[key: string]: string}>({});
   const layoutContainerRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const machinesRef = useRef<Machine[]>([]);
+  machinesRef.current = machines;
 
   useEffect(() => {
     if (id) {
       fetchDepartmentData();
       setupSocketListeners();
     }
+    
+    return () => {
+      socketService.off('machine-state-update');
+      socketService.off('production-update');
+      socketService.off('stoppage-added');
+      socketService.off('unclassified-stoppage-detected');
+    };
   }, [id]);
 
   const setupSocketListeners = () => {
     const handleMachineStateUpdate = (update: any) => {
-      // Check if this machine belongs to current department
-      const machine = machines.find(m => m._id === update.machineId);
+      const machine = machinesRef.current.find(m => m._id === update.machineId);
       if (machine) {
         setMachineStatuses(prev => ({
           ...prev,
           [update.machineId]: update.status
         }));
         
-        // Update machine status in machines array
         setMachines(prevMachines => 
           prevMachines.map(m => 
             m._id === update.machineId 
@@ -70,13 +83,35 @@ const DepartmentView: React.FC = () => {
               : m
           )
         );
+        
+        fetchDepartmentStats();
+      }
+    };
+
+    const handleProductionUpdate = (update: any) => {
+      const machine = machinesRef.current.find(m => m._id === update.machineId);
+      if (machine) {
+        fetchDepartmentStats();
+      }
+    };
+
+    const handleStoppageUpdate = (update: any) => {
+      const machine = machinesRef.current.find(m => m._id === update.machineId);
+      if (machine) {
+        fetchDepartmentStats();
       }
     };
 
     socketService.on('machine-state-update', handleMachineStateUpdate);
+    socketService.on('production-update', handleProductionUpdate);
+    socketService.on('stoppage-added', handleStoppageUpdate);
+    socketService.on('unclassified-stoppage-detected', handleStoppageUpdate);
 
     return () => {
       socketService.off('machine-state-update', handleMachineStateUpdate);
+      socketService.off('production-update', handleProductionUpdate);
+      socketService.off('stoppage-added', handleStoppageUpdate);
+      socketService.off('unclassified-stoppage-detected', handleStoppageUpdate);
     };
   };
 
@@ -87,20 +122,55 @@ const DepartmentView: React.FC = () => {
       setDepartment(deptData);
       setMachines(deptData.machines || []);
       
-      // Initialize positions
       const initialPositions: {[key: string]: {x: number; y: number}} = {};
-      
-      // Add explicit type to machine parameter
       deptData.machines?.forEach((machine: Machine) => {
         initialPositions[machine._id] = { ...machine.position };
       });
 
-    setPositions(initialPositions);
+      setPositions(initialPositions);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch department data';
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDepartmentStats = async () => {
+    try {
+      let totalUnits = 0;
+      let totalOEE = 0;
+      let runningMachines = 0;
+      let stoppedMachines = 0;
+
+      const statsPromises = machines.map(machine => 
+        apiService.getMachineStats(machine._id, '24h').catch(() => null)
+      );
+      
+      const allStats = await Promise.all(statsPromises);
+      
+      allStats.forEach((stats, index) => {
+        if (stats) {
+          totalUnits += stats.totalUnitsProduced;
+          totalOEE += stats.oee;
+        }
+        
+        const machineStatus = machineStatuses[machines[index]._id] || machines[index].status;
+        if (machineStatus === 'running') {
+          runningMachines++;
+        } else {
+          stoppedMachines++;
+        }
+      });
+
+      setDepartmentStats({
+        totalUnits,
+        avgOEE: machines.length > 0 ? Math.round(totalOEE / machines.length) : 0,
+        runningMachines,
+        stoppedMachines
+      });
+    } catch (err) {
+      console.error('Failed to fetch department stats:', err);
     }
   };
 
@@ -113,13 +183,13 @@ const DepartmentView: React.FC = () => {
   const getStatusColor = (status: Machine['status']) => {
     switch (status) {
       case 'running': return 'bg-green-500';
-      case 'running_producing': return 'bg-green-500';
       case 'stopped': return 'bg-red-500';
-      case 'powered_off': return 'bg-gray-500';
-      case 'powered_off_producing': return 'bg-orange-500';
-      case 'unclassified_stoppage': return 'bg-red-600';
+      case 'inactive': return 'bg-gray-500';
+      case 'unclassified': return 'bg-red-600';
       case 'maintenance': return 'bg-yellow-500';
       case 'error': return 'bg-red-600';
+      case 'breakdown': return 'bg-orange-600';
+      case 'mold_change': return 'bg-purple-500';
       default: return 'bg-gray-500';
     }
   };
@@ -127,13 +197,13 @@ const DepartmentView: React.FC = () => {
   const getStatusText = (status: Machine['status']) => {
     switch (status) {
       case 'running': return 'Running';
-      case 'running_producing': return 'Running';
       case 'stopped': return 'Stopped';
-      case 'powered_off': return 'Powered Off';
-      case 'powered_off_producing': return 'Powered Off (Producing)';
-      case 'unclassified_stoppage': return 'Unclassified Stoppage';
+      case 'inactive': return 'Inactive';
+      case 'unclassified': return 'Unclassified Stoppage';
       case 'maintenance': return 'Maintenance';
       case 'error': return 'Error';
+      case 'breakdown': return 'Breakdown';
+      case 'mold_change': return 'Mold Change';
       default: return 'Unknown';
     }
   };
@@ -170,7 +240,6 @@ const DepartmentView: React.FC = () => {
         await apiService.deleteMachine(machineId);
         setMachines(machines.filter(m => m._id !== machineId));
         
-        // Clear dragging state if deleting the dragged machine
         if (draggingMachineId === machineId) {
           setDraggingMachineId(null);
         }
@@ -182,12 +251,10 @@ const DepartmentView: React.FC = () => {
     }
   };
 
-
   const handleMouseDown = (machineId: string, e: React.MouseEvent) => {
     if (!editLayoutMode || !layoutContainerRef.current) return;
     e.stopPropagation();
     
-    // Calculate offset from mouse to machine position
     const containerRect = layoutContainerRef.current.getBoundingClientRect();
     const machineX = positions[machineId]?.x || 0;
     const machineY = positions[machineId]?.y || 0;
@@ -207,7 +274,6 @@ const DepartmentView: React.FC = () => {
     const x = e.clientX - containerRect.left - dragOffset.current.x;
     const y = e.clientY - containerRect.top - dragOffset.current.y;
     
-    // Keep within container bounds
     const boundedX = Math.max(10, Math.min(x, containerRect.width - 210));
     const boundedY = Math.max(10, Math.min(y, containerRect.height - 210));
     
@@ -220,14 +286,12 @@ const DepartmentView: React.FC = () => {
   const handleMouseUp = async () => {
     if (!editLayoutMode || !draggingMachineId) return;
     
-    // Check if machine still exists
     if (!machines.some(m => m._id === draggingMachineId)) {
       setDraggingMachineId(null);
       return;
     }
 
     try {
-      // Only save if position actually changed
       await apiService.updateMachinePosition(
         draggingMachineId, 
         positions[draggingMachineId]
@@ -243,7 +307,6 @@ const DepartmentView: React.FC = () => {
 
   const handleSaveLayout = async () => {
     try {
-      // Filter out deleted machines
       const validPositions = Object.keys(positions)
         .filter(machineId => machines.some(m => m._id === machineId))
         .reduce((acc, machineId) => {
@@ -251,7 +314,6 @@ const DepartmentView: React.FC = () => {
           return acc;
         }, {} as {[key: string]: {x: number; y: number}});
 
-      // Save only positions for existing machines
       await Promise.all(
         Object.entries(validPositions).map(([machineId, position]) => 
           apiService.updateMachinePosition(machineId, position)
@@ -346,9 +408,7 @@ const DepartmentView: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-400">Running</p>
-              <p className="text-xl font-semibold text-green-400">
-                {machines.filter(m => m.status === 'running').length}
-              </p>
+              <p className="text-xl font-semibold text-green-400">{departmentStats.runningMachines}</p>
             </div>
             <Power className="h-8 w-8 text-green-400" />
           </div>
@@ -358,9 +418,7 @@ const DepartmentView: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-400">Stopped</p>
-              <p className="text-xl font-semibold text-red-400">
-                {machines.filter(m => m.status === 'stopped').length}
-              </p>
+              <p className="text-xl font-semibold text-red-400">{departmentStats.stoppedMachines}</p>
             </div>
             <AlertTriangle className="h-8 w-8 text-red-400" />
           </div>
@@ -369,8 +427,8 @@ const DepartmentView: React.FC = () => {
         <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Avg OEE</p>
-              <p className="text-xl font-semibold text-yellow-400">76%</p>
+              <p className="text-sm text-gray-400">Department OEE</p>
+              <p className="text-xl font-semibold text-yellow-400">{departmentStats.avgOEE}%</p>
             </div>
             <Gauge className="h-8 w-8 text-yellow-400" />
           </div>
@@ -447,10 +505,11 @@ const DepartmentView: React.FC = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-400">Status</span>
                       <span className={`font-medium ${
-                        (machineStatuses[machine._id] || machine.status) === 'running' || (machineStatuses[machine._id] || machine.status) === 'running_producing' ? 'text-green-400' :
-                        (machineStatuses[machine._id] || machine.status) === 'stopped' || (machineStatuses[machine._id] || machine.status) === 'powered_off' ? 'text-red-400' :
-                        (machineStatuses[machine._id] || machine.status) === 'unclassified_stoppage' ? 'text-red-500' :
-                        (machineStatuses[machine._id] || machine.status) === 'powered_off_producing' ? 'text-orange-400' :
+                        (machineStatuses[machine._id] || machine.status) === 'running' ? 'text-green-400' :
+                        (machineStatuses[machine._id] || machine.status) === 'stopped' || (machineStatuses[machine._id] || machine.status) === 'inactive' ? 'text-red-400' :
+                        (machineStatuses[machine._id] || machine.status) === 'unclassified' ? 'text-red-500 animate-pulse' :
+                        (machineStatuses[machine._id] || machine.status) === 'breakdown' ? 'text-orange-400' :
+                        (machineStatuses[machine._id] || machine.status) === 'mold_change' ? 'text-purple-400' :
                         (machineStatuses[machine._id] || machine.status) === 'maintenance' ? 'text-yellow-400' :
                         'text-red-400'
                       }`}>

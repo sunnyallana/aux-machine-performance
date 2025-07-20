@@ -34,13 +34,19 @@ router.get('/', auth, adminAuth, async (req, res) => {
 // Update configuration
 router.put('/', auth, adminAuth, async (req, res) => {
   try {
-    let config = await Config.findOne();
-    if (!config) {
-      config = new Config(req.body);
-    } else {
-      Object.assign(config, req.body);
-    }
-    await config.save();
+    const configData = req.body;
+    
+    // Use findOneAndUpdate with upsert to handle the version conflict
+    const config = await Config.findOneAndUpdate(
+      {}, // Empty filter to match any document
+      configData,
+      { 
+        new: true, 
+        upsert: true,
+        runValidators: true
+      }
+    );
+    
     res.json(config);
   } catch (error) {
     console.error('Config update error:', error);

@@ -13,7 +13,8 @@ import {
   Building2,
   Activity,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -191,6 +192,27 @@ const Reports: React.FC = () => {
       toast.success('PDF downloaded successfully');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to download PDF';
+      toast.error(message);
+    }
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    if (!confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await fetch(`http://localhost:3001/api/reports/${reportId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      setReports(reports.filter(r => r._id !== reportId));
+      toast.success('Report deleted successfully');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete report';
       toast.error(message);
     }
   };
@@ -477,6 +499,13 @@ const Reports: React.FC = () => {
                         title="Email Report"
                       >
                         <Mail className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReport(report._id)}
+                        className="text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700"
+                        title="Delete Report"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </td>

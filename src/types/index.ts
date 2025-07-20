@@ -25,7 +25,7 @@ export interface Machine {
   description?: string;
   departmentId: string | Department;
   position: { x: number; y: number };
-  status: string | 'running' | 'stopped' | 'maintenance' | 'error' | 'running_producing' | 'powered_off' | 'powered_off_producing' | 'unclassified_stoppage';
+  status: 'running' | 'stopped' | 'maintenance' | 'error' | 'breakdown' | 'mold_change' | 'unclassified' | 'inactive';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -59,7 +59,7 @@ export interface ProductionHour {
 
 export interface StoppageRecord {
   _id: string;
-  reason: 'planned' | 'mold_change' | 'breakdown' | 'maintenance' | 'material_shortage' | 'other' | 'undefined';
+  reason: 'planned' | 'mold_change' | 'breakdown' | 'maintenance' | 'material_shortage' | 'other' | 'unclassified';
   description?: string;
   startTime: string | null;
   endTime?: string | null;
