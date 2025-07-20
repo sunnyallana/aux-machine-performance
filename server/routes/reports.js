@@ -321,9 +321,9 @@ async function generatePDF(report) {
     const logoPath = path.join(__dirname, '../assets/dawlance-logo.png');
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 
-        doc.page.width / 2 - 50,
-        45, 
-        { width: 100 }
+        doc.page.width / 2 - 100,
+        0, 
+        { width: 210 }
       );
       doc.y = 85;
     } else {

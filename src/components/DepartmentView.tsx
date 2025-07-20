@@ -138,42 +138,58 @@ const DepartmentView: React.FC = () => {
   };
 
   const fetchDepartmentStats = async () => {
-    try {
-      let totalUnits = 0;
-      let totalOEE = 0;
-      let runningMachines = 0;
-      let stoppedMachines = 0;
+  try {
+    const currentMachines = machinesRef.current;
+    let totalUnits = 0;
+    let totalOEE = 0;
+    let runningMachines = 0;
+    let stoppedMachines = 0;
+    let statsCount = 0;
 
-      const statsPromises = machines.map(machine => 
-        apiService.getMachineStats(machine._id, '24h').catch(() => null)
-      );
-      
-      const allStats = await Promise.all(statsPromises);
-      
-      allStats.forEach((stats, index) => {
-        if (stats) {
-          totalUnits += stats.totalUnitsProduced;
-          totalOEE += stats.oee;
-        }
-        
-        const machineStatus = machineStatuses[machines[index]._id] || machines[index].status;
-        if (machineStatus === 'running') {
-          runningMachines++;
-        } else {
-          stoppedMachines++;
-        }
-      });
+    const statsPromises = currentMachines.map(machine => 
+      apiService.getMachineStats(machine._id, '24h').catch(() => null)
+    );
+    
+    const allStats = await Promise.all(statsPromises);
+    
+    // Create a map of machineId -> stats for machines that have stats
+    const statsMap = new Map<string, MachineStats>();
+    currentMachines.forEach((machine, index) => {
+      if (allStats[index]) {
+        statsMap.set(machine._id, allStats[index]!);
+      }
+    });
 
-      setDepartmentStats({
-        totalUnits,
-        avgOEE: machines.length > 0 ? Math.round(totalOEE / machines.length) : 0,
-        runningMachines,
-        stoppedMachines
-      });
-    } catch (err) {
-      console.error('Failed to fetch department stats:', err);
-    }
-  };
+    currentMachines.forEach(machine => {
+      // Count running and stopped machines
+      if (machine.status === 'running') {
+        runningMachines++;
+      } else {
+        stoppedMachines++;
+      }
+
+      // Aggregate stats if available for this machine
+      if (statsMap.has(machine._id)) {
+        const stats = statsMap.get(machine._id)!;
+        totalUnits += stats.totalUnitsProduced;
+        totalOEE += stats.oee;
+        statsCount++;
+      }
+    });
+
+    // Calculate average OEE using actual number of machines with stats
+    const avgOEE = statsCount > 0 ? Math.round(totalOEE / statsCount) : 0;
+
+    setDepartmentStats({
+      totalUnits,
+      avgOEE,
+      runningMachines,
+      stoppedMachines
+    });
+  } catch (err) {
+    console.error('Failed to fetch department stats:', err);
+  }
+};
 
   const handleMachineClick = (machineId: string) => {
     if (!editLayoutMode) {
