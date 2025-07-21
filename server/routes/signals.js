@@ -117,7 +117,7 @@ router.post('/pin-data', async (req, res) => {
       }
 
       setInterval(() => {
-          updateOngoingStoppages(new Date());
+          updateOngoingStoppages(new Date(), io); // Pass io here
       }, 60000);
       
       // Update machine last activity
@@ -187,9 +187,6 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
           startTime: currentTime,
           detectedAt: currentTime
         });
-        
-        // Store unclassified stoppage in database
-        await storeUnclassifiedStoppage(machineId, currentTime, io);
       }
       
     } else if (!hasPower && hasCycle) {
@@ -291,89 +288,6 @@ async function updateRunningMinutes(machineId, currentTime, io) {
   }
 }
 
-
-// Update this function to track startTime and calculate duration properly
-async function storeUnclassifiedStoppage(machineId, currentTime, io) {
-  try {
-    const currentHour = currentTime.getHours();
-    const currentDate = currentTime.toISOString().split('T')[0];
-    
-    // Find production record
-    let productionRecord = await ProductionRecord.findOne({
-      machineId,
-      startTime: {
-        $gte: new Date(currentDate + 'T00:00:00.000Z'),
-        $lt: new Date(currentDate + 'T23:59:59.999Z')
-      }
-    });
-
-    if (!productionRecord) {
-      productionRecord = new ProductionRecord({
-        machineId,
-        startTime: new Date(currentDate + 'T00:00:00.000Z'),
-        hourlyData: []
-      });
-    }
-
-    // Find or create hourly data
-    let hourData = productionRecord.hourlyData.find(h => h.hour === currentHour);
-    if (!hourData) {
-      hourData = {
-        hour: currentHour,
-        unitsProduced: 0,
-        defectiveUnits: 0,
-        status: 'stoppage',
-        runningMinutes: 0,
-        stoppageMinutes: 0,
-        stoppages: []
-      };
-      productionRecord.hourlyData.push(hourData);
-    }
-
-    // Add unclassified stoppage record
-    const unclassifiedStoppageId = `unclassified_${machineId}_${Date.now()}`;
-    const unclassifiedStoppageRecord = {
-      _id: unclassifiedStoppageId,
-      reason: 'unclassified',
-      description: 'Automatic stoppage detection - awaiting categorization',
-      startTime: currentTime, // Store actual start time
-      endTime: null,
-      duration: 0,
-      isPending: true
-    };
-
-    // Check if unclassified stoppage already exists
-    const existingIndex = hourData.stoppages.findIndex(s => s.reason === 'unclassified');
-    if (existingIndex === -1) {
-      hourData.stoppages.push(unclassifiedStoppageRecord);
-      hourData.status = 'stoppage';
-      
-      await productionRecord.save();
-      
-      // Store in memory for tracking
-      unclassifiedStoppages.set(machineId, {
-        id: unclassifiedStoppageId,
-        startTime: currentTime, // Store actual start time
-        hour: currentHour,
-        date: currentDate
-      });
-
-      // Emit socket event for unclassified stoppage
-      io.emit('unclassified-stoppage-detected', {
-        machineId: machineId.toString(),
-        hour: currentHour,
-        date: currentDate,
-        stoppageStart: currentTime,
-        pendingStoppageId: unclassifiedStoppageId,
-        timestamp: currentTime
-      });
-    }
-  } catch (error) {
-    console.error('Error storing unclassified stoppage:', error);
-  }
-}
-
-
 async function createPendingStoppage(machineId, currentTime, io) {
   try {
     const currentHour = currentTime.getHours();
@@ -418,6 +332,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
     
     if (!existingUnclassified) {
       const newStoppage = {
+        _id: new mongoose.Types.ObjectId(), // FIX: Generate ObjectId
         reason: 'unclassified',
         description: 'Automatic stoppage detection - awaiting categorization',
         startTime: currentTime,
@@ -435,7 +350,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
       
       // Store in memory
       unclassifiedStoppages.set(machineId, {
-        id: newStoppage._id, // Use the generated _id
+        id: newStoppage._id.toString(), // FIX: Store as string
         startTime: currentTime,
         hour: currentHour,
         date: currentDate
@@ -447,7 +362,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
         hour: currentHour,
         date: currentDate,
         stoppageStart: currentTime,
-        pendingStoppageId: newStoppage._id.toString(),
+        pendingStoppageId: newStoppage._id.toString(), // FIX: Use generated ID
         timestamp: currentTime
       });
     }
@@ -494,7 +409,7 @@ async function resolvePendingStoppage(machineId, currentTime, io) {
   }
 }
 
-async function updateOngoingStoppages(currentTime) {
+async function updateOngoingStoppages(currentTime, io) { // FIX: Add io parameter
   try {
     for (const [machineId, stoppageInfo] of unclassifiedStoppages) {
       const { id, startTime, hour, date } = stoppageInfo;
@@ -508,6 +423,7 @@ async function updateOngoingStoppages(currentTime) {
       if (productionRecord) {
         const hourData = productionRecord.hourlyData.find(h => h.hour === hour);
         if (hourData) {
+          // FIX: Use string comparison for ID matching
           const stoppageIndex = hourData.stoppages.findIndex(s => s._id.toString() === id);
           if (stoppageIndex >= 0) {
             // Update duration
