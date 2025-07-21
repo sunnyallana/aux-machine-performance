@@ -11,9 +11,6 @@ import {
   X, 
   Plus,
   Play,
-  Pause,
-  Settings,
-  Package,
   TrendingUp,
   TrendingDown,
   Activity,
@@ -259,15 +256,21 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                 <h4 className="text-sm font-medium text-white mb-3">Time Distribution</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center">
-                    <div className="text-lg font-bold text-green-400">{hour.runningMinutes || 0}m</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {Math.min(60, hour.runningMinutes || 0)}m
+                    </div>
                     <div className="text-xs text-gray-400">Running Time</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-red-400">{hour.stoppageMinutes || 0}m</div>
+                    <div className="text-lg font-bold text-red-400">
+                      {Math.min(60, hour.stoppageMinutes || 0)}m
+                    </div>
                     <div className="text-xs text-gray-400">Stoppage Time</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-gray-400">{60 - (hour.runningMinutes || 0) - (hour.stoppageMinutes || 0)}m</div>
+                    <div className="text-lg font-bold text-gray-400">
+                      {60 - Math.min(60, hour.runningMinutes || 0) - Math.min(60, hour.stoppageMinutes || 0)}m
+                    </div>
                     <div className="text-xs text-gray-400">Inactive Time</div>
                   </div>
                 </div>
@@ -277,15 +280,15 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                   <div className="h-full flex">
                     <div 
                       className="bg-green-500" 
-                      style={{ width: `${((hour.runningMinutes || 0) / 60) * 100}%` }}
+                      style={{ width: `${Math.min(100, ((hour.runningMinutes || 0) / 60) * 100)}%` }}
                     ></div>
                     <div 
                       className="bg-red-500" 
-                      style={{ width: `${((hour.stoppageMinutes || 0) / 60) * 100}%` }}
+                      style={{ width: `${Math.min(100, ((hour.stoppageMinutes || 0) / 60) * 100)}%` }}
                     ></div>
                     <div 
                       className="bg-gray-500" 
-                      style={{ width: `${((60 - (hour.runningMinutes || 0) - (hour.stoppageMinutes || 0)) / 60) * 100}%` }}
+                      style={{ width: `${Math.max(0, ((60 - (hour.runningMinutes || 0) - (hour.stoppageMinutes || 0)) / 60) * 100)}%` }}
                     ></div>
                   </div>
                 </div>
@@ -707,8 +710,14 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                 newData[dayIndex].hours[hourIndex].status = 'stoppage';
               }
             }
+
+            newData[dayIndex].hours[hourIndex].stoppageMinutes = 
+            newData[dayIndex].hours[hourIndex].stoppages.reduce(
+              (sum, s) => sum + (s.duration || 0), 0
+            );
+
           }
-          
+
           return newData;
         });
       }
@@ -748,12 +757,48 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       }
     };
 
+    // Modify handleStoppageUpdated
+    const handleStoppageUpdated = (update: any) => {
+      if (update.machineId === machineId) {
+        setData(prevData => {
+          const newData = [...prevData];
+          const dayIndex = newData.findIndex(day => day.date === update.date);
+          
+          if (dayIndex >= 0) {
+            const hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === update.hour);
+            if (hourIndex >= 0) {
+              const stoppageIndex = newData[dayIndex].hours[hourIndex].stoppages.findIndex(
+                s => s._id === update.stoppageId
+              );
+              
+              if (stoppageIndex >= 0) {
+                // Update duration AND startTime
+                newData[dayIndex].hours[hourIndex].stoppages[stoppageIndex] = {
+                  ...newData[dayIndex].hours[hourIndex].stoppages[stoppageIndex],
+                  duration: update.duration,
+                  startTime: new Date(Date.now() - update.duration * 60000).toISOString()
+                };
+                
+                // Update total stoppage minutes
+                newData[dayIndex].hours[hourIndex].stoppageMinutes = 
+                  newData[dayIndex].hours[hourIndex].stoppages.reduce(
+                    (sum, stoppage) => sum + (stoppage.duration || 0), 0
+                  );
+              }
+            }
+          }
+          return newData;
+        });
+      }
+    };
+
     socketService.on('production-update', handleProductionUpdate);
     socketService.on('running-time-update', handleRunningTimeUpdate);
     socketService.on('machine-state-update', handleMachineStateUpdate);
     socketService.on('unclassified-stoppage-detected', handleUnclassifiedStoppageDetected);
     socketService.on('stoppage-added', handleStoppageAdded);
     socketService.on('production-assignment-updated', handleProductionAssignmentUpdated);
+    socketService.on('stoppage-updated', handleStoppageUpdated);
 
     return () => {
       socketService.off('production-update', handleProductionUpdate);
@@ -762,6 +807,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       socketService.off('unclassified-stoppage-detected', handleUnclassifiedStoppageDetected);
       socketService.off('stoppage-added', handleStoppageAdded);
       socketService.off('production-assignment-updated', handleProductionAssignmentUpdated);
+      socketService.off('stoppage-updated', handleStoppageUpdated);
       socketService.leaveMachine(machineId);
     };
   }, [machineId, availableOperators, availableMolds]);
@@ -1114,9 +1160,13 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                     )}
                     <div>Status: <span className="capitalize">{hour.status.replace('_', ' ')}</span></div>
                     {hour.stoppages.length > 0 && (
-                      <div className="text-red-400">
-                        {hasUnclassifiedStoppage && ' (UNCLASSIFIED)'}
-                        {hour.stoppages.length} stoppage{hour.stoppages.length > 1 ? 's' : ''}
+                      <div className="mt-1">
+                        {hour.stoppages.map((stoppage, idx) => (
+                          <div key={idx} className="text-red-300">
+                            {stoppage.reason === 'unclassified' ? 'Unclassified' : stoppage.reason}: 
+                            {stoppage.duration} min
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

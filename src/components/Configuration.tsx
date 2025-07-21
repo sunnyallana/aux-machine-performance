@@ -53,6 +53,13 @@ const Configuration: React.FC = () => {
         apiService.getSensors(),
         apiService.getPinMappings()
       ]);
+
+      if (!configData.signalTimeouts) {
+      configData.signalTimeouts = {
+        powerSignalTimeout: 5,
+        cycleSignalTimeout: 2
+      };
+    }
       
       setConfig(configData);
       setSensors(sensorsData);
@@ -490,163 +497,167 @@ const Configuration: React.FC = () => {
           </div>
         )}
 
-        {/* Shift Management Tab */}
-        {activeTab === 'shifts' && config && (
-          <div className="space-y-6">
-            {/* Add New Shift */}
-            <div className={`rounded-lg border p-6 ${
-              isDarkMode 
-                ? 'bg-gray-800 border-gray-700' 
-                : 'bg-white border-gray-200 shadow-sm'
-            }`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-blue-400" />
-                  <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Shift Management</h2>
+        {/* Shift Management Tab - FIXED SECTION */}
+        {activeTab === 'shifts' && config && (() => {
+          const shifts = config.shifts || [];
+          
+          return (
+            <div className="space-y-6">
+              {/* Add New Shift */}
+              <div className={`rounded-lg border p-6 ${
+                isDarkMode 
+                  ? 'bg-gray-800 border-gray-700' 
+                  : 'bg-white border-gray-200 shadow-sm'
+              }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-5 w-5 text-blue-400" />
+                    <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Shift Management</h2>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newShift = {
+                        name: `Shift ${shifts.length + 1}`,
+                        startTime: '08:00',
+                        endTime: '16:00',
+                        isActive: true
+                      };
+                      setConfig({
+                        ...config,
+                        shifts: [...shifts, newShift]
+                      });
+                    }}
+                    className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add Shift</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    const newShift = {
-                      name: `Shift ${(config.shifts?.length || 0) + 1}`,
-                      startTime: '08:00',
-                      endTime: '16:00',
-                      isActive: true
-                    };
-                    setConfig({
-                      ...config,
-                      shifts: [...(config.shifts || []), newShift]
-                    });
-                  }}
-                  className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add Shift</span>
-                </button>
-              </div>
 
-              {config.shifts && config.shifts.length > 0 ? (
-                <div className="space-y-4">
-                  {config.shifts.map((shift, index) => (
-                    <div key={index} className={`rounded-lg p-4 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                    }`}>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                        <div>
-                          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Shift Name
-                          </label>
-                          <input
-                            type="text"
-                            value={shift.name}
-                            onChange={(e) => {
-                              const updatedShifts = [...config.shifts];
-                              updatedShifts[index].name = e.target.value;
-                              setConfig({ ...config, shifts: updatedShifts });
-                            }}
-                            className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              isDarkMode 
-                                ? 'bg-gray-600 border-gray-500 text-white' 
-                                : 'bg-white border-gray-300 text-gray-900'
-                            }`}
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Start Time
-                          </label>
-                          <input
-                            type="time"
-                            value={shift.startTime}
-                            onChange={(e) => {
-                              const updatedShifts = [...config.shifts];
-                              updatedShifts[index].startTime = e.target.value;
-                              setConfig({ ...config, shifts: updatedShifts });
-                            }}
-                            className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              isDarkMode 
-                                ? 'bg-gray-600 border-gray-500 text-white' 
-                                : 'bg-white border-gray-300 text-gray-900'
-                            }`}
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            End Time
-                          </label>
-                          <input
-                            type="time"
-                            value={shift.endTime}
-                            onChange={(e) => {
-                              const updatedShifts = [...config.shifts];
-                              updatedShifts[index].endTime = e.target.value;
-                              setConfig({ ...config, shifts: updatedShifts });
-                            }}
-                            className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              isDarkMode 
-                                ? 'bg-gray-600 border-gray-500 text-white' 
-                                : 'bg-white border-gray-300 text-gray-900'
-                            }`}
-                          />
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <div className="flex items-center">
-                            <label className="relative inline-flex items-center cursor-pointer">
+                {shifts.length > 0 ? (
+                  <div className="space-y-4">
+                    {shifts.map((shift, index) => (
+                      <div key={index} className={`rounded-lg p-4 ${
+                        isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+                      }`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                          <div>
+                            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Shift Name
+                            </label>
                             <input
-                              type="checkbox"
-                              checked={shift.isActive}
+                              type="text"
+                              value={shift.name}
                               onChange={(e) => {
-                                const updatedShifts = [...(config.shifts || [])];
-                                updatedShifts[index].isActive = e.target.checked;
+                                const updatedShifts = [...shifts];
+                                updatedShifts[index].name = e.target.value;
                                 setConfig({ ...config, shifts: updatedShifts });
                               }}
-                              className="sr-only peer"
+                              className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                isDarkMode 
+                                  ? 'bg-gray-600 border-gray-500 text-white' 
+                                  : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
-                            <div className={`relative w-11 h-6 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 ${
-                              isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
-                            }`}></div>
-                            <span className={`ml-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Active</span>
-                            </label>
                           </div>
                           
-                          <button
-                            onClick={() => {
-                              const updatedShifts = (config.shifts || []).filter((_, i) => i !== index);
-                              setConfig({ ...config, shifts: updatedShifts });
-                            }}
-                            className={`p-1 ${isDarkMode ? 'text-red-400 hover:text-red-300' : 'text-red-500 hover:text-red-700'}`}
-                            title="Delete shift"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div>
+                            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Start Time
+                            </label>
+                            <input
+                              type="time"
+                              value={shift.startTime}
+                              onChange={(e) => {
+                                const updatedShifts = [...shifts];
+                                updatedShifts[index].startTime = e.target.value;
+                                setConfig({ ...config, shifts: updatedShifts });
+                              }}
+                              className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                isDarkMode 
+                                  ? 'bg-gray-600 border-gray-500 text-white' 
+                                  : 'bg-white border-gray-300 text-gray-900'
+                              }`}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              End Time
+                            </label>
+                            <input
+                              type="time"
+                              value={shift.endTime}
+                              onChange={(e) => {
+                                const updatedShifts = [...shifts];
+                                updatedShifts[index].endTime = e.target.value;
+                                setConfig({ ...config, shifts: updatedShifts });
+                              }}
+                              className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                isDarkMode 
+                                  ? 'bg-gray-600 border-gray-500 text-white' 
+                                  : 'bg-white border-gray-300 text-gray-900'
+                              }`}
+                            />
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center">
+                              <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={shift.isActive}
+                                onChange={(e) => {
+                                  const updatedShifts = [...shifts];
+                                  updatedShifts[index].isActive = e.target.checked;
+                                  setConfig({ ...config, shifts: updatedShifts });
+                                }}
+                                className="sr-only peer"
+                              />
+                              <div className={`relative w-11 h-6 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 ${
+                                isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
+                              }`}></div>
+                              <span className={`ml-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Active</span>
+                              </label>
+                            </div>
+                            
+                            <button
+                              onClick={() => {
+                                const updatedShifts = shifts.filter((_, i) => i !== index);
+                                setConfig({ ...config, shifts: updatedShifts });
+                              }}
+                              className={`p-1 ${isDarkMode ? 'text-red-400 hover:text-red-300' : 'text-red-500 hover:text-red-700'}`}
+                              title="Delete shift"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Clock className={`h-12 w-12 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>No shifts configured</p>
-                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Add your first shift to get started</p>
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Clock className={`h-12 w-12 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>No shifts configured</p>
+                    <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Add your first shift to get started</p>
+                  </div>
+                )}
 
-              <div className="mt-6">
-                <button
-                  onClick={() => handleConfigUpdate({ shifts: config.shifts || [] })}
-                  disabled={saving}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>{saving ? 'Saving...' : 'Save Shifts'}</span>
-                </button>
+                <div className="mt-6">
+                  <button
+                    onClick={() => handleConfigUpdate({ shifts })}
+                    disabled={saving}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>{saving ? 'Saving...' : 'Save Shifts'}</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Pin Mapping */}
         {activeTab === 'mapping' && (

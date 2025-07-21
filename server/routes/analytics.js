@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const SignalData = require('../models/SignalData');
 const ProductionRecord = require('../models/ProductionRecord');
-const StoppageRecord = require('../models/StoppageRecord');
 const Machine = require('../models/Machine');
 const Config = require('../models/Config');
 const { auth } = require('../middleware/auth');
@@ -57,8 +56,9 @@ router.get('/production-timeline/:machineId', auth, async (req, res) => {
         
         // Calculate running vs stoppage time
         const runningMinutes = hourData?.runningMinutes || 0;
-        const stoppageMinutes = hourData?.stoppageMinutes || 0;
-        
+        // Calculate stoppage minutes from actual stoppages
+        const stoppageMinutes = hourData?.stoppages.reduce((sum, s) => sum + (s.duration || 0), 0) || 0;
+
         // Determine status based on activity
         let status = 'inactive';
         if (runningMinutes > 0) {
@@ -144,16 +144,25 @@ router.post('/stoppage', auth, async (req, res) => {
       );
       
       if (stoppageIndex >= 0) {
-        // Update the existing pending stoppage
-        hourData.stoppages[stoppageIndex].reason = reason;
-        hourData.stoppages[stoppageIndex].description = description;
-        if (reason === 'breakdown') {
-          hourData.stoppages[stoppageIndex].sapNotificationNumber = sapNotificationNumber;
-        }
-        hourData.stoppages[stoppageIndex].isPending = false;
-        hourData.stoppages[stoppageIndex].isClassified = true;
-        hourData.stoppages[stoppageIndex].endTime = new Date();
-        hourData.stoppages[stoppageIndex].duration = duration;
+          const pendingStoppage = hourData.stoppages[stoppageIndex];
+          
+          // FIX: Replace currentTime with new Date()
+          const actualDuration = Math.floor(
+            (new Date() - pendingStoppage.startTime) / (1000 * 60)
+          );
+          
+          // Update the existing pending stoppage
+          hourData.stoppages[stoppageIndex].reason = reason;
+          hourData.stoppages[stoppageIndex].description = description;
+          hourData.stoppages[stoppageIndex].endTime = new Date();
+          hourData.stoppages[stoppageIndex].duration = actualDuration; // Use actual duration
+          
+          if (reason === 'breakdown') {
+            hourData.stoppages[stoppageIndex].sapNotificationNumber = sapNotificationNumber;
+          }
+          
+          hourData.stoppages[stoppageIndex].isPending = false;
+          hourData.stoppages[stoppageIndex].isClassified = true;
       } else {
         // If pending stoppage not found, create new one
         const stoppageStart = new Date(`${date}T${hour.toString().padStart(2, '0')}:00:00`);
@@ -196,7 +205,7 @@ router.post('/stoppage', auth, async (req, res) => {
       
       hourData.stoppages.push(newStoppage);
 
-      hourData.stoppageMinutes = Math.min(60, hourData.stoppageMinutes + duration);
+      hourData.stoppageMinutes = hourData.stoppages.reduce((sum, s) => sum + (s.duration || 0), 0);
     }
 
     // Set status based on reason with specific colors
@@ -323,23 +332,6 @@ router.post('/production-assignment', auth, async (req, res) => {
     res.json({ message: 'Production assignment updated successfully' });
   } catch (error) {
     console.error('Error saving assignment:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// Update stoppage record
-router.put('/stoppage/:id', auth, async (req, res) => {
-  try {
-    const stoppage = await StoppageRecord.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-    if (!stoppage) {
-      return res.status(404).json({ message: 'Stoppage record not found' });
-    }
-    res.json(stoppage);
-  } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

@@ -58,7 +58,7 @@ const Login: React.FC = () => {
             <Factory className="h-8 w-8 text-white" />
           </div>
           <h2 className={`mt-6 text-3xl font-extrabold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            Industrial IoT Monitor
+            Dawlance | LineSentry
           </h2>
           <p className={`mt-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             Sign in to access your production dashboard

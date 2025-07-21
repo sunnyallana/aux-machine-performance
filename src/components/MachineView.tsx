@@ -29,7 +29,7 @@ const MachineView: React.FC = () => {
   const [stats, setStats] = useState<MachineStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('24h');
-  const [machineStatus, setMachineStatus] = useState<string>('stopped');
+  const [machineStatus, setMachineStatus] = useState<string>('inactive');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',

@@ -99,7 +99,7 @@ export interface Config {
     rack: number;
     slot: number;
   };
-  signalTimeouts?: {
+  signalTimeouts: {
     powerSignalTimeout: number;
     cycleSignalTimeout: number;
   };

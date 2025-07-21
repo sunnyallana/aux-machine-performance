@@ -3,7 +3,7 @@ import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ThemeContext } from '../App';
-import { Department, MachineStats } from '../types';
+import { Department } from '../types';
 import apiService from '../services/api';
 import socketService from '../services/socket';
 import { 

@@ -80,4 +80,21 @@ productionRecordSchema.pre('save', async function(next) {
   next();
 });
 
+productionRecordSchema.pre('save', function(next) {
+  this.hourlyData.forEach(hour => {
+    // Cap times at 60 minutes
+    hour.runningMinutes = Math.min(60, hour.runningMinutes || 0);
+    hour.stoppageMinutes = Math.min(60, hour.stoppageMinutes || 0);
+    
+    // Calculate from actual stoppages if needed
+    if (hour.stoppages.length > 0) {
+      const calculated = hour.stoppages.reduce(
+        (sum, s) => sum + (s.duration || 0), 0
+      );
+      hour.stoppageMinutes = Math.min(60, calculated);
+    }
+  });
+  next();
+});
+
 module.exports = mongoose.model('ProductionRecord', productionRecordSchema);

@@ -3,7 +3,6 @@ const Machine = require('../models/Machine');
 const SignalData = require('../models/SignalData');
 const Sensor = require('../models/Sensor');
 const ProductionRecord = require('../models/ProductionRecord');
-const StoppageRecord = require('../models/StoppageRecord');
 const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -111,7 +110,6 @@ router.delete('/:id', auth, adminAuth, async (req, res) => {
     await Promise.all([
       Sensor.deleteMany({ machineId }),
       ProductionRecord.deleteMany({ machineId }),
-      StoppageRecord.deleteMany({ machineId }),
       SignalData.deleteMany({ machineId })
     ]);
     
