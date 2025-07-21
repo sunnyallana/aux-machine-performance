@@ -241,7 +241,7 @@ router.post('/stoppage', auth, async (req, res) => {
 // Update production assignment
 router.post('/production-assignment', auth, async (req, res) => {
   try {
-    const { machineId, hour, date, operatorId, moldId, defectiveUnits } = req.body;
+    const { machineId, hour, date, operatorId, moldId, defectiveUnits, applyToShift } = req.body;
     const io = req.app.get('io');
     
     // Validate and convert operatorId to ObjectId if provided
@@ -289,43 +289,89 @@ router.post('/production-assignment', auth, async (req, res) => {
       });
     }
 
-    // Find or create hourly data
-    let hourData = productionRecord.hourlyData.find(h => h.hour === hour);
-    if (!hourData) {
-      hourData = {
-        hour,
-        unitsProduced: 0,
-        defectiveUnits: 0,
-        status: 'inactive',
-        runningMinutes: 0,
-        stoppageMinutes: 0,
-        stoppages: []
-      };
-      productionRecord.hourlyData.push(hourData);
+    // Get shift configuration
+    const config = await Config.findOne();
+    const shifts = config?.shifts || [];
+    
+    // Determine hours to update
+    let hoursToUpdate = [hour];
+    if (applyToShift) {
+      // Find shift that contains the current hour
+      const shift = shifts.find(s => {
+        const startHour = parseInt(s.startTime.split(':')[0]);
+        const endHour = parseInt(s.endTime.split(':')[0]);
+        
+        if (startHour <= endHour) {
+          return hour >= startHour && hour < endHour;
+        } else {
+          return hour >= startHour || hour < endHour;
+        }
+      });
+
+      if (shift) {
+        // Calculate all hours in the shift
+        hoursToUpdate = [];
+        const startHour = parseInt(shift.startTime.split(':')[0]);
+        const endHour = parseInt(shift.endTime.split(':')[0]);
+        
+        if (startHour <= endHour) {
+          for (let h = startHour; h < endHour; h++) {
+            hoursToUpdate.push(h);
+          }
+        } else {
+          for (let h = startHour; h < 24; h++) {
+            hoursToUpdate.push(h);
+          }
+          for (let h = 0; h < endHour; h++) {
+            hoursToUpdate.push(h);
+          }
+        }
+      }
     }
 
-    // Update assignments
-    if (validOperatorId) hourData.operatorId = validOperatorId;
-    if (validMoldId) hourData.moldId = validMoldId;
-    if (defectiveUnits !== undefined) {
-      hourData.defectiveUnits = defectiveUnits;
+    // Update each hour in the range
+    for (const targetHour of hoursToUpdate) {
+      // Find or create hourly data
+      let hourData = productionRecord.hourlyData.find(h => h.hour === targetHour);
+      if (!hourData) {
+        hourData = {
+          hour: targetHour,
+          unitsProduced: 0,
+          defectiveUnits: 0,
+          status: 'inactive',
+          runningMinutes: 0,
+          stoppageMinutes: 0,
+          stoppages: []
+        };
+        productionRecord.hourlyData.push(hourData);
+      }
+
+      // Update assignments
+      if (validOperatorId) hourData.operatorId = validOperatorId;
+      if (validMoldId) hourData.moldId = validMoldId;
       
-      // Update total defective units
-      productionRecord.defectiveUnits = productionRecord.hourlyData.reduce(
-        (sum, h) => sum + (h.defectiveUnits || 0), 0
-      );
+      // Only update defective units for the original hour
+      if (targetHour === hour && defectiveUnits !== undefined) {
+        hourData.defectiveUnits = defectiveUnits;
+      }
     }
+
+    // Update total defective units
+    productionRecord.defectiveUnits = productionRecord.hourlyData.reduce(
+      (sum, h) => sum + (h.defectiveUnits || 0), 0
+    );
 
     await productionRecord.save();
 
     // Emit socket event
     io.emit('production-assignment-updated', {
       machineId,
-      hour,
+      hours: hoursToUpdate,
       date,
       operatorId: validOperatorId,
       moldId: validMoldId,
-      defectiveUnits,
+      originalHour: hour,
+      defectiveUnits: hour === hour ? defectiveUnits : undefined,
       timestamp: new Date()
     });
 

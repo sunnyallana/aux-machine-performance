@@ -39,6 +39,7 @@ interface ProductionModalProps {
   onUpdateProduction?: (machineId: string, hour: number, date: string, data: any) => void;
   availableOperators?: User[];
   availableMolds?: Mold[];
+  shifts: any[];
 }
 
 const ProductionModal: React.FC<ProductionModalProps> = ({
@@ -50,7 +51,8 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   onAddStoppage,
   onUpdateProduction,
   availableOperators = [],
-  availableMolds = []
+  availableMolds = [],
+  shifts = []
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'stoppage' | 'assignment'>('details');
   const [stoppageForm, setStoppageForm] = useState({
@@ -64,6 +66,8 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
     moldId: hour.mold?._id || '',
     defectiveUnits: hour.defectiveUnits || 0
   });
+  const [applyToShift, setApplyToShift] = useState(false);
+  const [shiftInfo, setShiftInfo] = useState<{name: string; hours: number[]} | null>(null);
 
   // Check for pending stoppages
   const pendingStoppage = hour.stoppages.find(s => s.reason === 'unclassified' || (s as any).isPending);
@@ -79,6 +83,48 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       });
     }
   }, [pendingStoppage]);
+
+  // Detect shift when hour changes
+  useEffect(() => {
+    if (shifts.length > 0 && hour) {
+      // Find shift containing the current hour
+      const currentShift = shifts.find(shift => {
+        const startHour = parseInt(shift.startTime.split(':')[0]);
+        const endHour = parseInt(shift.endTime.split(':')[0]);
+        
+        if (endHour > startHour) {
+          return hour.hour >= startHour && hour.hour < endHour;
+        } else {
+          return hour.hour >= startHour || hour.hour < endHour;
+        }
+      });
+
+      if (currentShift) {
+        // Calculate hours in shift
+        const shiftHours = [];
+        const startHour = parseInt(currentShift.startTime.split(':')[0]);
+        const endHour = parseInt(currentShift.endTime.split(':')[0]);
+        
+        if (endHour > startHour) {
+          for (let h = startHour; h < endHour; h++) {
+            shiftHours.push(h);
+          }
+        } else {
+          for (let h = startHour; h < 24; h++) shiftHours.push(h);
+          for (let h = 0; h < endHour; h++) shiftHours.push(h);
+        }
+        
+        setShiftInfo({
+          name: currentShift.name,
+          hours: shiftHours
+        });
+        setApplyToShift(true); // Default to shift-wide assignment
+      } else {
+        setShiftInfo(null);
+        setApplyToShift(false);
+      }
+    }
+  }, [shifts, hour]);
 
   if (!isOpen) return null;
 
@@ -130,10 +176,15 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
         date,
         operatorId: assignmentForm.operatorId || null,
         moldId: assignmentForm.moldId || null,
-        defectiveUnits: assignmentForm.defectiveUnits
+        defectiveUnits: assignmentForm.defectiveUnits,
+        applyToShift: shiftInfo ? applyToShift : false
       });
       
-      toast.success('Assignment updated successfully');
+      const message = applyToShift && shiftInfo 
+        ? `Assignment updated for entire ${shiftInfo.name} shift` 
+        : 'Assignment updated successfully';
+      
+      toast.success(message);
       onClose();
       
     } catch (error) {
@@ -413,6 +464,47 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                 />
               </div>
 
+              {/* Shift Assignment Section */}
+              {shiftInfo && (
+                <div className="mt-4 p-3 bg-gray-750 rounded-lg border border-blue-500/30">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="applyToShift"
+                      checked={applyToShift}
+                      onChange={(e) => setApplyToShift(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 rounded border-gray-600 bg-gray-700 focus:ring-blue-500"
+                    />
+                    <label htmlFor="applyToShift" className="ml-2 text-sm font-medium text-blue-400">
+                      Apply to entire shift ({shiftInfo.name})
+                    </label>
+                  </div>
+                  
+                  {applyToShift && (
+                    <div className="mt-2 text-xs text-gray-400">
+                      <p>This will apply operator and mold to:</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {shiftInfo.hours.map(h => (
+                          <span 
+                            key={h} 
+                            className={`px-2 py-1 rounded ${
+                              h === hour.hour 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-gray-700 text-gray-300'
+                            }`}
+                          >
+                            {h.toString().padStart(2, '0')}:00
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-blue-300">
+                        Note: Defective units will only be updated for the current hour ({hour.hour}:00)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex space-x-3 pt-4">
                 <button
                   type="submit"
@@ -555,6 +647,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [machineStatus, setMachineStatus] = useState<string>('inactive');
   const [machineColor, setMachineColor] = useState<string>('gray');
+  const [shifts, setShifts] = useState<any[]>([]);
 
   // Update current time every minute
   useEffect(() => {
@@ -730,26 +823,32 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           const dayIndex = newData.findIndex(day => day.date === update.date);
           
           if (dayIndex >= 0) {
-            const hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === update.hour);
-            if (hourIndex >= 0) {
-              if (update.operatorId) {
-                const operator = availableOperators.find(op => op._id === update.operatorId || op.id === update.operatorId);
-                if (operator) {
-                  newData[dayIndex].hours[hourIndex].operator = operator;
+            // Update all affected hours
+            update.hours.forEach((targetHour: number) => {
+              const hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === targetHour);
+              if (hourIndex >= 0) {
+                if (update.operatorId) {
+                  const operator = availableOperators.find(op => 
+                    op._id === update.operatorId || op.id === update.operatorId
+                  );
+                  if (operator) {
+                    newData[dayIndex].hours[hourIndex].operator = operator;
+                  }
+                }
+                
+                if (update.moldId) {
+                  const mold = availableMolds.find(m => m._id === update.moldId);
+                  if (mold) {
+                    newData[dayIndex].hours[hourIndex].mold = mold;
+                  }
+                }
+                
+                // Only update defective units for the original hour
+                if (targetHour === update.originalHour && update.defectiveUnits !== undefined) {
+                  newData[dayIndex].hours[hourIndex].defectiveUnits = update.defectiveUnits;
                 }
               }
-              
-              if (update.moldId) {
-                const mold = availableMolds.find(m => m._id === update.moldId);
-                if (mold) {
-                  newData[dayIndex].hours[hourIndex].mold = mold;
-                }
-              }
-              
-              if (update.defectiveUnits !== undefined) {
-                newData[dayIndex].hours[hourIndex].defectiveUnits = update.defectiveUnits;
-              }
-            }
+            });
           }
           
           return newData;
@@ -757,7 +856,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       }
     };
 
-    // Modify handleStoppageUpdated
     const handleStoppageUpdated = (update: any) => {
       if (update.machineId === machineId) {
         setData(prevData => {
@@ -828,6 +926,20 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
     };
 
     fetchData();
+  }, []);
+
+  // Fetch shifts
+  useEffect(() => {
+    const fetchShifts = async () => {
+      try {
+        const config = await apiService.getConfig();
+        setShifts(config.shifts || []);
+      } catch (error) {
+        console.error('Failed to fetch shifts:', error);
+      }
+    };
+    
+    fetchShifts();
   }, []);
 
   // Filter data based on view mode and current time
@@ -1255,6 +1367,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           onUpdateProduction={onUpdateProduction}
           availableOperators={availableOperators}
           availableMolds={availableMolds}
+          shifts={shifts}
         />
       )}
     </div>
