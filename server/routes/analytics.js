@@ -1,6 +1,5 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const SignalData = require('../models/SignalData');
 const ProductionRecord = require('../models/ProductionRecord');
 const Machine = require('../models/Machine');
 const Config = require('../models/Config');
@@ -246,6 +245,7 @@ router.post('/production-assignment', auth, async (req, res) => {
     
     // Validate and convert operatorId to ObjectId if provided
     let validOperatorId = null;
+    
     if (operatorId && operatorId.trim() !== '') {
       // Check if it's already a valid ObjectId
       if (mongoose.Types.ObjectId.isValid(operatorId)) {
@@ -422,7 +422,11 @@ router.get('/machine-stats/:machineId', auth, async (req, res) => {
     const productionRecords = await ProductionRecord.find({
       machineId,
       startTime: { $gte: startDate, $lte: endDate }
+    }).populate({
+      path: 'hourlyData.moldId',
+      model: 'Mold'
     });
+
 
     const totalUnitsProduced = productionRecords.reduce((sum, record) => 
       sum + record.unitsProduced, 0
@@ -438,14 +442,21 @@ router.get('/machine-stats/:machineId', auth, async (req, res) => {
     let totalStoppages = 0;
     let breakdownStoppages = 0;
     let totalBreakdownMinutes = 0;
+    let totalExpectedUnits = 0;
 
-    productionRecords.forEach(record => {
+     productionRecords.forEach(record => {
       record.hourlyData.forEach(hourData => {
         totalRunningMinutes += hourData.runningMinutes || 0;
         totalStoppageMinutes += hourData.stoppageMinutes || 0;
         totalStoppages += hourData.stoppages?.length || 0;
-        
-        // Count breakdown stoppages for MTTR and MTBF calculation
+
+        // Calculate expected units based on ACTUAL RUNNING TIME
+        if (hourData.moldId?.productionCapacityPerHour) {
+          const capacityPerMinute = hourData.moldId.productionCapacityPerHour / 60;
+          totalExpectedUnits += capacityPerMinute * (hourData.runningMinutes || 0);
+        }
+
+        // Count breakdown stoppages
         hourData.stoppages?.forEach(stoppage => {
           if (stoppage.reason === 'breakdown') {
             breakdownStoppages++;
@@ -455,35 +466,28 @@ router.get('/machine-stats/:machineId', auth, async (req, res) => {
       });
     });
 
-    // Get shift configuration for availability calculation
-    const config = await Config.findOne();
-    const shifts = config?.shifts || [];
-    const totalShiftMinutes = shifts.reduce((sum, shift) => {
-      if (!shift.isActive) return sum;
-      const startHour = parseInt(shift.startTime.split(':')[0]);
-      const startMinute = parseInt(shift.startTime.split(':')[1]);
-      const endHour = parseInt(shift.endTime.split(':')[0]);
-      const endMinute = parseInt(shift.endTime.split(':')[1]);
-      
-      let shiftDuration;
-      if (endHour > startHour || (endHour === startHour && endMinute > startMinute)) {
-        shiftDuration = (endHour - startHour) * 60 + (endMinute - startMinute);
-      } else {
-        // Night shift crossing midnight
-        shiftDuration = (24 - startHour + endHour) * 60 + (endMinute - startMinute);
-      }
-      return sum + shiftDuration;
-    }, 0);
-    
-    // Calculate availability: Time in production / Total shift times * 100
-    const availability = totalShiftMinutes > 0 ? (totalRunningMinutes / totalShiftMinutes) : 0;
+
+    // Calculate availability
+    const totalAvailableMinutes = totalRunningMinutes + totalStoppageMinutes;
+    const availability = totalAvailableMinutes > 0 
+      ? (totalRunningMinutes / totalAvailableMinutes)
+      : 0;
     
     // Calculate quality: Goods without defect / total goods * 100
     const quality = totalUnitsProduced > 0 ? (totalUnitsProduced - totalDefectiveUnits) / totalUnitsProduced : 0;
     
-    // Calculate performance: (Units produced / hour) / (Mold capacity / hour) * 100
-    // For now, we'll use a default performance rate since mold capacity isn't directly linked
-    const performance = 0.85; // This should be calculated based on mold capacity when available
+    productionRecords.forEach(record => {
+      record.hourlyData.forEach(hourData => {
+        if (hourData.moldId && hourData.moldId.productionCapacityPerHour) {
+          totalExpectedUnits += hourData.moldId.productionCapacityPerHour;
+        }
+      });
+    });
+
+    // Then calculate performance:
+    const performance = totalExpectedUnits > 0 
+      ? (totalUnitsProduced / totalExpectedUnits)
+      : 0;
     
     const oee = availability * quality * performance;
 

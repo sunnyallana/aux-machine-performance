@@ -37,7 +37,7 @@ const Login: React.FC = () => {
       setDemoInitialized(true);
       setError('');
     } catch (err) {
-      setError('Failed to initialize demo accounts');
+      setError(err instanceof Error ? err.message :'Failed to initialize demo accounts');
     }
   };
 

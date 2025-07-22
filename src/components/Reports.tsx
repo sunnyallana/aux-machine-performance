@@ -6,12 +6,7 @@ import {
   FileText, 
   Download, 
   Mail, 
-  Calendar, 
-  TrendingUp,
-  Clock,
   AlertTriangle,
-  Building2,
-  Activity,
   Filter,
   RefreshCw,
   Trash2

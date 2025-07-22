@@ -14,8 +14,6 @@ import {
   AlertTriangle,
   Clock,
   Gauge,
-  Power,
-  Settings,
   Zap,
   ZapOff,
   Edit,
@@ -137,7 +135,7 @@ const MachineView: React.FC = () => {
       toast.success('Stoppage recorded successfully');
       fetchMachineData(); // Refresh timeline data
     } catch (err) {
-      toast.error('Failed to record stoppage');
+      toast.error(err instanceof Error ? err.message :'Failed to record stoppage');
     }
   };
 
@@ -152,7 +150,7 @@ const MachineView: React.FC = () => {
       toast.success('Production data updated');
       fetchMachineData(); // Refresh timeline data
     } catch (err) {
-      toast.error('Failed to update production data');
+      toast.error(err instanceof Error ? err.message :'Failed to update production data');
     }
   };
 
@@ -170,7 +168,7 @@ const MachineView: React.FC = () => {
       setIsEditing(false);
       toast.success('Machine details updated');
     } catch (err) {
-      toast.error('Failed to update machine');
+      toast.error(err instanceof Error ? err.message :'Failed to update machine');
     }
   };
 
