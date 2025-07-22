@@ -1,4 +1,3 @@
-// File: src/pages/DepartmentsPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Department, Machine, MachineStats, MachineStatus } from '../types';
 import apiService from '../services/api';
@@ -27,12 +27,6 @@ const DepartmentView: React.FC = () => {
   const { isAdmin } = useAuth();
   const [department, setDepartment] = useState<Department | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [departmentStats, setDepartmentStats] = useState({
-    totalUnits: 0,
-    avgOEE: 0,
-    runningMachines: 0,
-    stoppedMachines: 2
-  });
   const [loading, setLoading] = useState(true);
   const [isAddingMachine, setIsAddingMachine] = useState(false);
   const [newMachine, setNewMachine] = useState<{
@@ -53,6 +47,44 @@ const DepartmentView: React.FC = () => {
   const dragOffset = useRef({ x: 0, y: 0 });
   const machinesRef = useRef<Machine[]>([]);
   machinesRef.current = machines;
+
+  // Calculate department stats from machine data
+  const departmentStats = useMemo(() => {
+    let totalUnits = 0;
+    let totalOEE = 0;
+    let runningMachines = 0;
+    let stoppedMachines = 0;
+    let machinesWithStats = 0;
+
+    machines.forEach(machine => {
+      // Count machine states
+      if (machine.status === 'running') {
+        runningMachines++;
+      } else {
+        stoppedMachines++;
+      }
+
+      // Aggregate stats if available
+      if (machineStats[machine._id]) {
+        const stats = machineStats[machine._id];
+        totalUnits += stats.totalUnitsProduced || 0;
+        totalOEE += stats.oee || 0;
+        machinesWithStats++;
+      }
+    });
+
+    // Calculate average OEE
+    const avgOEE = machinesWithStats > 0 
+      ? Math.round(totalOEE / machinesWithStats) 
+      : 0;
+
+    return {
+      totalUnits,
+      avgOEE,
+      runningMachines,
+      stoppedMachines
+    };
+  }, [machines, machineStats]);
 
   useEffect(() => {
     if (id) {
@@ -84,22 +116,20 @@ const DepartmentView: React.FC = () => {
               : m
           )
         );
-        
-        fetchDepartmentStats();
       }
     };
 
     const handleProductionUpdate = (update: any) => {
       const machine = machinesRef.current.find(m => m._id === update.machineId);
       if (machine) {
-        fetchDepartmentStats();
+        fetchMachineStatsForMachine(update.machineId);
       }
     };
 
     const handleStoppageUpdate = (update: any) => {
       const machine = machinesRef.current.find(m => m._id === update.machineId);
       if (machine) {
-        fetchDepartmentStats();
+        fetchMachineStatsForMachine(update.machineId);
       }
     };
 
@@ -137,59 +167,36 @@ const DepartmentView: React.FC = () => {
     }
   };
 
-  const fetchDepartmentStats = async () => {
-  try {
-    const currentMachines = machinesRef.current;
-    let totalUnits = 0;
-    let totalOEE = 0;
-    let runningMachines = 0;
-    let stoppedMachines = 0;
-    let statsCount = 0;
+  const fetchMachineStatsForMachine = async (machineId: string) => {
+    try {
+      const stats = await apiService.getMachineStats(machineId, '24h');
+      setMachineStats(prev => ({
+        ...prev,
+        [machineId]: stats
+      }));
+    } catch (error) {
+      console.error(`Failed to fetch stats for machine ${machineId}:`, error);
+    }
+  };
 
-    const statsPromises = currentMachines.map(machine => 
-      apiService.getMachineStats(machine._id, '24h').catch(() => null)
-    );
-    
-    const allStats = await Promise.all(statsPromises);
-    
-    // Create a map of machineId -> stats for machines that have stats
-    const statsMap = new Map<string, MachineStats>();
-    currentMachines.forEach((machine, index) => {
-      if (allStats[index]) {
-        statsMap.set(machine._id, allStats[index]!);
+  const fetchMachineStats = async () => {
+    try {
+      const stats: {[machineId: string]: MachineStats} = {};
+      for (const machine of machines) {
+        const machineStats = await apiService.getMachineStats(machine._id, '24h');
+        stats[machine._id] = machineStats;
       }
-    });
+      setMachineStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch machine stats:', error);
+    }
+  };
 
-    currentMachines.forEach(machine => {
-      // Count running and stopped machines
-      if (machine.status === 'running') {
-        runningMachines++;
-      } else {
-        stoppedMachines++;
-      }
-
-      // Aggregate stats if available for this machine
-      if (statsMap.has(machine._id)) {
-        const stats = statsMap.get(machine._id)!;
-        totalUnits += stats.totalUnitsProduced;
-        totalOEE += stats.oee;
-        statsCount++;
-      }
-    });
-
-    // Calculate average OEE using actual number of machines with stats
-    const avgOEE = statsCount > 0 ? Math.round(totalOEE / statsCount) : 0;
-
-    setDepartmentStats({
-      totalUnits,
-      avgOEE,
-      runningMachines,
-      stoppedMachines
-    });
-  } catch (err) {
-    console.error('Failed to fetch department stats:', err);
-  }
-};
+  useEffect(() => {
+    if (machines.length > 0) {
+      fetchMachineStats();
+    }
+  }, [machines]);
 
   const handleMachineClick = (machineId: string) => {
     if (!editLayoutMode) {
@@ -216,25 +223,6 @@ const DepartmentView: React.FC = () => {
       default: return status;
     }
   };
-
-  const fetchMachineStats = async () => {
-    try {
-      const stats: {[machineId: string]: MachineStats} = {};
-      for (const machine of machines) {
-        const machineStats = await apiService.getMachineStats(machine._id, '24h');
-        stats[machine._id] = machineStats;
-      }
-      setMachineStats(stats);
-    } catch (error) {
-      console.error('Failed to fetch machine stats:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (machines.length > 0) {
-      fetchMachineStats();
-    }
-  }, [machines]);
 
   const handleAddMachine = async () => {
     try {
