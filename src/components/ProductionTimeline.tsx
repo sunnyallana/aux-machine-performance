@@ -100,25 +100,27 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       });
 
       if (currentShift) {
-        // Calculate hours in shift
-        const shiftHours = [];
         const startHour = parseInt(currentShift.startTime.split(':')[0]);
         const endHour = parseInt(currentShift.endTime.split(':')[0]);
-        
-        if (endHour > startHour) {
+        const shiftHours = [];
+
+        if (startHour <= endHour) {
           for (let h = startHour; h < endHour; h++) {
             shiftHours.push(h);
           }
         } else {
-          for (let h = startHour; h < 24; h++) shiftHours.push(h);
-          for (let h = 0; h < endHour; h++) shiftHours.push(h);
+          if (hour.hour >= startHour) {
+            for (let h = startHour; h < 24; h++) shiftHours.push(h);
+          } else if (hour.hour < endHour) {
+            for (let h = 0; h < endHour; h++) shiftHours.push(h);
+          }
         }
-        
+
         setShiftInfo({
           name: currentShift.name,
           hours: shiftHours
         });
-        setApplyToShift(true); // Default to shift-wide assignment
+        setApplyToShift(false);
       } else {
         setShiftInfo(null);
         setApplyToShift(false);
@@ -825,7 +827,25 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           if (dayIndex >= 0) {
             // Update all affected hours
             update.hours.forEach((targetHour: number) => {
-              const hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === targetHour);
+              let hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === targetHour);
+
+              // Create hour if doesn't exist
+              if (hourIndex === -1) {
+                const newHour: ProductionHour = {
+                  hour: targetHour,
+                  unitsProduced: 0,
+                  defectiveUnits: 0,
+                  status: 'inactive',
+                  operator: undefined,
+                  mold: undefined,
+                  stoppages: [],
+                  runningMinutes: 0,
+                  stoppageMinutes: 0
+                };
+                newData[dayIndex].hours.push(newHour);
+                hourIndex = newData[dayIndex].hours.length - 1;
+              }
+
               if (hourIndex >= 0) {
                 if (update.operatorId) {
                   const operator = availableOperators.find(op => 

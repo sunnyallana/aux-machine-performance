@@ -308,22 +308,28 @@ router.post('/production-assignment', auth, async (req, res) => {
         }
       });
 
-      if (shift) {
-        // Calculate all hours in the shift
-        hoursToUpdate = [];
+      if (applyToShift && shift) {
         const startHour = parseInt(shift.startTime.split(':')[0]);
         const endHour = parseInt(shift.endTime.split(':')[0]);
+        
+        hoursToUpdate = [];
         
         if (startHour <= endHour) {
           for (let h = startHour; h < endHour; h++) {
             hoursToUpdate.push(h);
           }
         } else {
-          for (let h = startHour; h < 24; h++) {
-            hoursToUpdate.push(h);
-          }
-          for (let h = 0; h < endHour; h++) {
-            hoursToUpdate.push(h);
+          // Night shift (crosses midnight)
+          if (hour >= startHour) {
+            // First part (current day)
+            for (let h = startHour; h < 24; h++) {
+              hoursToUpdate.push(h);
+            }
+          } else if (hour < endHour) {
+            // Second part (current day)
+            for (let h = 0; h < endHour; h++) {
+              hoursToUpdate.push(h);
+            }
           }
         }
       }
@@ -341,20 +347,23 @@ router.post('/production-assignment', auth, async (req, res) => {
           status: 'inactive',
           runningMinutes: 0,
           stoppageMinutes: 0,
-          stoppages: []
+          stoppages: [],
         };
+
+        if (validOperatorId) hourData.operatorId = validOperatorId;
+        if (validMoldId) hourData.moldId = validMoldId;
+
         productionRecord.hourlyData.push(hourData);
       }
 
-      // Update assignments
-      if (validOperatorId) hourData.operatorId = validOperatorId;
-      if (validMoldId) hourData.moldId = validMoldId;
       
       // Only update defective units for the original hour
       if (targetHour === hour && defectiveUnits !== undefined) {
         hourData.defectiveUnits = defectiveUnits;
       }
     }
+
+    productionRecord.markModified('hourlyData');
 
     // Update total defective units
     productionRecord.defectiveUnits = productionRecord.hourlyData.reduce(
