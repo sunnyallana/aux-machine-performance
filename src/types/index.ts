@@ -115,4 +115,42 @@ export interface Config {
     senderPassword: string;
     recipients: string[];
   };
+  metricsThresholds?: {
+    oee: {
+      excellent: number;
+      good: number;
+      fair: number;
+      poor: number;
+    };
+    availability: {
+      excellent: number;
+      good: number;
+      fair: number;
+      poor: number;
+    };
+    quality: {
+      excellent: number;
+      good: number;
+      fair: number;
+      poor: number;
+    };
+    performance: {
+      excellent: number;
+      good: number;
+      fair: number;
+      poor: number;
+    };
+    mtbf: {
+      excellent: number;
+      good: number;
+      fair: number;
+      poor: number;
+    };
+    mttr: {
+      excellent: number;
+      good: number;
+      fair: number;
+      poor: number;
+    };
+  };
 }

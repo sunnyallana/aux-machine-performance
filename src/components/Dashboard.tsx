@@ -284,7 +284,7 @@ const Dashboard: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>OEE</span>
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>OEE</span >
                     <div className="flex items-center space-x-1">
                       <Gauge className="h-4 w-4 text-yellow-400" />
                       <span className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>

@@ -9,23 +9,11 @@ router.get('/', auth, adminAuth, async (req, res) => {
   try {
     let config = await Config.findOne();
     if (!config) {
-      config = new Config({
-        plc: { ip: '192.168.1.11', rack: 0, slot: 1 },
-        signalTimeouts: {
-          powerSignalTimeout: 5,
-          cycleSignalTimeout: 2
-        },
-        email: { 
-          senderEmail: 'admin@gmail.com',
-          senderPassword: 'your-app-password',
-          recipients: [] 
-        },
-        shifts: []
-      });
+      config = new Config(); // Will use schema defaults
       await config.save();
     }
     res.json(config);
-  } catch (error) {
+  } catch (error) { 
     console.error('Config fetch error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }

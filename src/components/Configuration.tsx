@@ -13,7 +13,8 @@ import {
   Link,
   Plus,
   Trash2,
-  Clock
+  Clock,
+  BarChart2
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -53,6 +54,19 @@ const Configuration: React.FC = () => {
         apiService.getSensors(),
         apiService.getPinMappings()
       ]);
+
+
+    // Ensure all required fields exist
+    if (!configData.metricsThresholds) {
+      configData.metricsThresholds = {
+        oee: { excellent: 85, good: 70, fair: 50, poor: 0 },
+        availability: { excellent: 90, good: 80, fair: 70, poor: 0 },
+        quality: { excellent: 95, good: 90, fair: 85, poor: 0 },
+        performance: { excellent: 90, good: 80, fair: 70, poor: 0 },
+        mtbf: { excellent: 500, good: 300, fair: 150, poor: 0 },
+        mttr: { excellent: 20, good: 40, fair: 60, poor: 100 }
+      };
+    }
 
       if (!configData.signalTimeouts) {
       configData.signalTimeouts = {
@@ -208,7 +222,8 @@ const Configuration: React.FC = () => {
             { id: 'email', label: 'Email Settings', icon: Mail },
             { id: 'signals', label: 'Signal Settings', icon: Settings },
             { id: 'shifts', label: 'Shift Management', icon: Clock },
-            { id: 'mapping', label: 'Pin Mapping', icon: Link }
+            { id: 'mapping', label: 'Pin Mapping', icon: Link },
+            { id: 'thresholds', label: 'Metrics Thresholds', icon: BarChart2 }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -497,7 +512,7 @@ const Configuration: React.FC = () => {
           </div>
         )}
 
-        {/* Shift Management Tab - FIXED SECTION */}
+        {/* Shift Management Tab */}
         {activeTab === 'shifts' && config && (() => {
           const shifts = config.shifts || [];
           
@@ -824,6 +839,76 @@ const Configuration: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* Thresholds */}
+        {activeTab === 'thresholds' && config && config.metricsThresholds && (
+          <div className={`rounded-lg border p-6 ${
+            isDarkMode 
+              ? 'bg-gray-800 border-gray-700' 
+              : 'bg-white border-gray-200 shadow-sm'
+          }`}>
+            <div className="flex items-center space-x-2 mb-4">
+              <BarChart2 className="h-5 w-5 text-blue-400" />
+              <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                Performance Metric Thresholds
+              </h2>
+            </div>
+            
+            <div className="space-y-6">
+              {['oee', 'availability', 'quality', 'performance', 'mtbf', 'mttr'].map(metric => (
+                <div key={metric}>
+                  <h3 className={`text-md font-medium mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    {metric.toUpperCase()} Thresholds
+                    {['oee', 'availability', 'quality', 'performance'].includes(metric) ? ' (%)' : ' (minutes)'}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    {['excellent', 'good', 'fair', 'poor'].map(level => (
+                      <div key={`${metric}-${level}`}>
+                        <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </label>
+                        <input
+                          type="number"
+                          value={config.metricsThresholds[metric][level]}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value) || 0;
+                            setConfig({
+                              ...config,
+                              metricsThresholds: {
+                                ...config.metricsThresholds,
+                                [metric]: {
+                                  ...config.metricsThresholds[metric],
+                                  [level]: value
+                                }
+                              }
+                            });
+                          }}
+                          className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() => handleConfigUpdate({ metricsThresholds: config.metricsThresholds })}
+                disabled={saving}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving...' : 'Save Thresholds'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+        
       </div>
     </div>
   );
