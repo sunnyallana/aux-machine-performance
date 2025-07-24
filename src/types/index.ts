@@ -17,6 +17,7 @@ export interface Department {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  avgOEE?: number;
 }
 
 export type MachineStatus = 'running' | 'stoppage' | 'stopped_yet_producing' | 'inactive';

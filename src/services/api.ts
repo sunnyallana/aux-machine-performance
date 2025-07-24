@@ -89,6 +89,10 @@ class ApiService {
     });
   }
 
+  async getDepartmentStats(departmentId: string) {
+    return this.request(`/analytics/department-stats/${departmentId}`);
+  }
+
   // Machines
   async getMachinesByDepartment(departmentId: string) {
     return this.request(`/machines/department/${departmentId}`);

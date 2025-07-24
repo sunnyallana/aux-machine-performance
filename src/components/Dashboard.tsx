@@ -66,7 +66,12 @@ const Dashboard: React.FC = () => {
   const fetchDepartments = async () => {
     try {
       const data = await apiService.getDepartments();
-      setDepartments(data);
+      const departmentsWithOEE = await Promise.all(data.map(async (dept: any) => {
+      const stats = await apiService.getDepartmentStats(dept._id);
+        return { ...dept, avgOEE: stats.avgOEE };
+      }));
+
+      setDepartments(departmentsWithOEE);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch departments');
     } finally {
@@ -279,12 +284,15 @@ const Dashboard: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Performance</span>
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>OEE</span>
                     <div className="flex items-center space-x-1">
                       <Gauge className="h-4 w-4 text-yellow-400" />
-                      <span className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>82%</span>
+                      <span className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {department.avgOEE ? `${department.avgOEE} %` : `N/A`} 
+                      </span>
                     </div>
                   </div>
+
                 </div>
 
                 <div className={`mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
