@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ThemeContext } from '../App';
-import { Config, Sensor } from '../types';
+import { Config, Sensor, MetricKey, LevelKey } from '../types';
 import apiService from '../services/api';
 import {
   Settings,
@@ -855,14 +855,14 @@ const Configuration: React.FC = () => {
             </div>
             
             <div className="space-y-6">
-              {['oee', 'availability', 'quality', 'performance', 'mtbf', 'mttr'].map(metric => (
+              {(['oee', 'availability', 'quality', 'performance', 'mtbf', 'mttr'] as MetricKey[]).map(metric => (
                 <div key={metric}>
                   <h3 className={`text-md font-medium mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                     {metric.toUpperCase()} Thresholds
                     {['oee', 'availability', 'quality', 'performance'].includes(metric) ? ' (%)' : ' (minutes)'}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    {['excellent', 'good', 'fair', 'poor'].map(level => (
+                    {(['excellent', 'good', 'fair', 'poor'] as LevelKey[]).map(level => (
                       <div key={`${metric}-${level}`}>
                         <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                           {level.charAt(0).toUpperCase() + level.slice(1)}

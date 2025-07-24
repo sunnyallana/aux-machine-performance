@@ -115,7 +115,7 @@ export interface Config {
     senderPassword: string;
     recipients: string[];
   };
-  metricsThresholds?: {
+  metricsThresholds: {
     oee: {
       excellent: number;
       good: number;
@@ -154,3 +154,7 @@ export interface Config {
     };
   };
 }
+
+export type MetricKey = 'oee' | 'availability' | 'quality' | 'performance' | 'mtbf' | 'mttr';
+
+export type LevelKey = 'excellent' | 'good' | 'fair' | 'poor';
