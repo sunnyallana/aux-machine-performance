@@ -60,6 +60,18 @@ const MachineView: React.FC = () => {
       }
     };
 
+    const handleAssignmentUpdated = (update: any) => {
+      if (update.machineId === id) {
+        fetchStats();
+      }
+    };
+
+    const handleStoppageUpdated = (update: any) => {
+      if (update.machineId === id) {
+        fetchStats();
+      }
+    };
+
     const handleStoppageDetected = (stoppage: any) => {
       if (stoppage.machineId === id) {
         toast.warning(`Stoppage detected: ${stoppage.duration} minutes`, {
@@ -82,6 +94,8 @@ const MachineView: React.FC = () => {
 
     socketService.on('production-update', handleProductionUpdate);
     socketService.on('stoppage-detected', handleStoppageDetected);
+    socketService.on('production-assignment-updated', handleAssignmentUpdated);
+    socketService.on('stoppage-updated', handleStoppageUpdated);
     socketService.on('stoppage-added', handleStoppageDetected);
     socketService.on('machine-state-update', handleMachineStateUpdate);
 
@@ -90,6 +104,8 @@ const MachineView: React.FC = () => {
       socketService.off('stoppage-detected', handleStoppageDetected);
       socketService.off('stoppage-added', handleStoppageDetected);
       socketService.off('machine-state-update', handleMachineStateUpdate);
+      socketService.off('production-assignment-updated', handleAssignmentUpdated);
+      socketService.off('stoppage-updated', handleStoppageUpdated);
     };
   };
 
@@ -133,7 +149,7 @@ const MachineView: React.FC = () => {
         machineId: id
       });
       toast.success('Stoppage recorded successfully');
-      fetchMachineData(); // Refresh timeline data
+      fetchMachineData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message :'Failed to record stoppage');
     }
@@ -148,7 +164,8 @@ const MachineView: React.FC = () => {
         ...data
       });
       toast.success('Production data updated');
-      fetchMachineData(); // Refresh timeline data
+      fetchStats(); // Add this line
+      fetchMachineData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message :'Failed to update production data');
     }

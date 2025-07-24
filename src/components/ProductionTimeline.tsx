@@ -166,6 +166,12 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       console.error('Failed to add stoppage:', error);
       toast.error('Failed to record stoppage');
     }
+
+    socketService.emit('stoppage-updated', {
+      machineId,
+      date,
+      hour: hour.hour
+    });
   };
 
   const handleAssignmentSubmit = async (e: React.FormEvent) => {
@@ -193,6 +199,17 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       console.error('Failed to update assignment:', error);
       toast.error('Failed to update assignment');
     }
+
+    socketService.emit('production-assignment-updated', {
+      machineId,
+      date,
+      hours: applyToShift && shiftInfo ? shiftInfo.hours : [hour.hour],
+      originalHour: hour.hour,
+      operatorId: assignmentForm.operatorId,
+      moldId: assignmentForm.moldId,
+      defectiveUnits: assignmentForm.defectiveUnits
+    });
+
   };
 
   const getStatusColor = (status: string) => {
