@@ -288,7 +288,7 @@ const Dashboard: React.FC = () => {
                     <div className="flex items-center space-x-1">
                       <Gauge className="h-4 w-4 text-yellow-400" />
                       <span className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {department.avgOEE ? `${department.avgOEE} %` : `N/A`} 
+                        {department.avgOEE ? `${department.avgOEE}%` : `N/A`} 
                       </span>
                     </div>
                   </div>

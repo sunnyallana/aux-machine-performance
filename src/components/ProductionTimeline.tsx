@@ -1004,7 +1004,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   const getHourColor = (hour: ProductionHour) => {
     // Map to the new 4 states
     let status: string = 'inactive';
-    
     if (hour.status === 'running') status = 'running';
     else if (hour.status === 'stoppage') status = 'stoppage';
     else if (hour.status === 'stopped_yet_producing') status = 'stopped_yet_producing';

@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const Report = require('../models/Report');
 const ProductionRecord = require('../models/ProductionRecord');
 const Machine = require('../models/Machine');
-const Department = require('../models/Department');
 const Config = require('../models/Config');
 const { auth, adminAuth } = require('../middleware/auth');
 const nodemailer = require('nodemailer');
@@ -132,7 +131,11 @@ async function generateReport({ type, startDate, endDate, departmentId, machineI
   }
 
   const productionRecords = await ProductionRecord.find(query)
-    .populate('machineId operatorId moldId');
+  .populate('machineId operatorId')
+  .populate({
+    path: 'hourlyData.moldId',
+    model: 'Mold'
+  });
 
   // Get shifts configuration
   const config = await Config.findOne();
@@ -155,12 +158,16 @@ async function generateReport({ type, startDate, endDate, departmentId, machineI
   return report;
 }
 
-function calculateMetrics(productionRecords, shifts, startDate, endDate) {
+// Replace the calculateMetrics function with this updated version
+function calculateMetrics(productionRecords, shifts) {
   let totalUnitsProduced = 0;
   let totalDefectiveUnits = 0;
   let totalRunningMinutes = 0;
   let totalStoppageMinutes = 0;
+  let totalExpectedUnits = 0;
   let totalStoppages = 0;
+  let breakdownStoppages = 0;
+  let totalBreakdownMinutes = 0;
 
   const shiftMetrics = {};
   
@@ -171,11 +178,11 @@ function calculateMetrics(productionRecords, shifts, startDate, endDate) {
       startTime: shift.startTime,
       endTime: shift.endTime,
       metrics: {
-        oee: 0,
         unitsProduced: 0,
         defectiveUnits: 0,
         runningMinutes: 0,
-        stoppageMinutes: 0
+        stoppageMinutes: 0,
+        expectedUnits: 0
       }
     };
   });
@@ -189,6 +196,21 @@ function calculateMetrics(productionRecords, shifts, startDate, endDate) {
       totalStoppageMinutes += hourData.stoppageMinutes || 0;
       totalStoppages += hourData.stoppages?.length || 0;
 
+      // Calculate expected units based on mold capacity
+      if (hourData.moldId?.productionCapacityPerHour) {
+        const capacityPerMinute = hourData.moldId.productionCapacityPerHour / 60;
+        const expectedUnits = capacityPerMinute * (hourData.runningMinutes || 0);
+        totalExpectedUnits += expectedUnits;
+      }
+
+      // Count breakdown stoppages
+      hourData.stoppages?.forEach(stoppage => {
+        if (stoppage.reason === 'breakdown') {
+          breakdownStoppages++;
+          totalBreakdownMinutes += stoppage.duration || 0;
+        }
+      });
+
       // Calculate shift-wise metrics
       const hour = hourData.hour;
       const shift = getShiftForHour(hour, shifts);
@@ -197,6 +219,13 @@ function calculateMetrics(productionRecords, shifts, startDate, endDate) {
         shiftMetrics[shift.name].metrics.defectiveUnits += hourData.defectiveUnits || 0;
         shiftMetrics[shift.name].metrics.runningMinutes += hourData.runningMinutes || 0;
         shiftMetrics[shift.name].metrics.stoppageMinutes += hourData.stoppageMinutes || 0;
+        
+        // Calculate expected units for shift
+        if (hourData.moldId?.productionCapacityPerHour) {
+          const capacityPerMinute = hourData.moldId.productionCapacityPerHour / 60;
+          shiftMetrics[shift.name].metrics.expectedUnits += 
+            capacityPerMinute * (hourData.runningMinutes || 0);
+        }
       }
     });
   });
@@ -204,20 +233,40 @@ function calculateMetrics(productionRecords, shifts, startDate, endDate) {
   // Calculate overall metrics
   const totalMinutes = totalRunningMinutes + totalStoppageMinutes;
   const availability = totalMinutes > 0 ? (totalRunningMinutes / totalMinutes) : 0;
-  const quality = totalUnitsProduced > 0 ? (totalUnitsProduced - totalDefectiveUnits) / totalUnitsProduced : 0;
-  const performance = 0.85; // This should be calculated based on ideal cycle time
+  const quality = totalUnitsProduced > 0 ? 
+    (totalUnitsProduced - totalDefectiveUnits) / totalUnitsProduced : 0;
+  const performance = totalExpectedUnits > 0 ? 
+    (totalUnitsProduced / totalExpectedUnits) : 0;
   const oee = availability * quality * performance;
 
-  const mtbf = totalStoppages > 0 ? totalRunningMinutes / totalStoppages : 0;
-  const mttr = totalStoppages > 0 ? totalStoppageMinutes / totalStoppages : 0;
+  // Calculate MTBF and MTTR based on breakdowns only
+  const mtbf = breakdownStoppages > 0 ? totalRunningMinutes / breakdownStoppages : 0;
+  const mttr = breakdownStoppages > 0 ? totalBreakdownMinutes / breakdownStoppages : 0;
 
   // Calculate shift OEE
-  Object.values(shiftMetrics).forEach(shiftData => {
-    const shiftTotalMinutes = shiftData.metrics.runningMinutes + shiftData.metrics.stoppageMinutes;
-    const shiftAvailability = shiftTotalMinutes > 0 ? (shiftData.metrics.runningMinutes / shiftTotalMinutes) : 0;
-    const shiftQuality = shiftData.metrics.unitsProduced > 0 ? 
-      (shiftData.metrics.unitsProduced - shiftData.metrics.defectiveUnits) / shiftData.metrics.unitsProduced : 0;
-    shiftData.metrics.oee = Math.round(shiftAvailability * shiftQuality * performance * 100);
+  const shiftData = Object.values(shiftMetrics).map(shiftInfo => {
+    const shiftMetricsData = shiftInfo.metrics;
+    const shiftTotalMinutes = shiftMetricsData.runningMinutes + shiftMetricsData.stoppageMinutes;
+    const shiftAvailability = shiftTotalMinutes > 0 ? 
+      (shiftMetricsData.runningMinutes / shiftTotalMinutes) : 0;
+    const shiftQuality = shiftMetricsData.unitsProduced > 0 ? 
+      (shiftMetricsData.unitsProduced - shiftMetricsData.defectiveUnits) / shiftMetricsData.unitsProduced : 0;
+    const shiftPerformance = shiftMetricsData.expectedUnits > 0 ? 
+      (shiftMetricsData.unitsProduced / shiftMetricsData.expectedUnits) : 0;
+    const shiftOEE = shiftAvailability * shiftQuality * shiftPerformance;
+
+    return {
+      shiftName: shiftInfo.shiftName,
+      startTime: shiftInfo.startTime,
+      endTime: shiftInfo.endTime,
+      metrics: {
+        oee: Math.round(shiftOEE * 100),
+        unitsProduced: shiftMetricsData.unitsProduced,
+        defectiveUnits: shiftMetricsData.defectiveUnits,
+        runningMinutes: shiftMetricsData.runningMinutes,
+        stoppageMinutes: shiftMetricsData.stoppageMinutes
+      }
+    };
   });
 
   return {
@@ -232,7 +281,7 @@ function calculateMetrics(productionRecords, shifts, startDate, endDate) {
     totalRunningMinutes,
     totalStoppageMinutes,
     totalStoppages,
-    shiftData: Object.values(shiftMetrics)
+    shiftData
   };
 }
 
@@ -602,6 +651,9 @@ async function generatePDF(report) {
     doc.end();
   });
 }
+
+
+
 
 // Helper functions
 function getOEEColor(oee) {

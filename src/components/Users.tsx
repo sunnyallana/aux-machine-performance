@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ThemeContext } from '../App';
 import apiService from '../services/api';
@@ -24,7 +23,6 @@ import 'react-toastify/dist/ReactToastify.css';
 const Users: React.FC = () => {
   const { isAdmin } = useAuth();
   const { isDarkMode } = useContext(ThemeContext);
-  const navigate = useNavigate();
   const [users, setUsers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

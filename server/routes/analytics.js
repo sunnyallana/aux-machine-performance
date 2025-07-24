@@ -77,13 +77,6 @@ async function calculateMachineStats(machineId, period) {
   // Calculate quality: Goods without defect / total goods * 100
   const quality = totalUnitsProduced > 0 ? (totalUnitsProduced - totalDefectiveUnits) / totalUnitsProduced : 0;
   
-  productionRecords.forEach(record => {
-    record.hourlyData.forEach(hourData => {
-      if (hourData.moldId && hourData.moldId.productionCapacityPerHour) {
-        totalExpectedUnits += hourData.moldId.productionCapacityPerHour;
-      }
-    });
-  });
 
   // Then calculate performance:
   const performance = totalExpectedUnits > 0 
