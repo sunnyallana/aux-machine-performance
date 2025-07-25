@@ -6,7 +6,7 @@ const router = express.Router();
 
 
 // Get all users (Admin only)
-router.get('/', auth, adminAuth, async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const users = await User.find({})
       .populate('departmentId', 'name _id')
