@@ -120,41 +120,40 @@ export interface Config {
       excellent: number;
       good: number;
       fair: number;
-      poor: number;
     };
     availability: {
       excellent: number;
       good: number;
       fair: number;
-      poor: number;
     };
     quality: {
       excellent: number;
       good: number;
       fair: number;
-      poor: number;
     };
     performance: {
       excellent: number;
       good: number;
       fair: number;
-      poor: number;
     };
     mtbf: {
       excellent: number;
       good: number;
       fair: number;
-      poor: number;
     };
     mttr: {
       excellent: number;
       good: number;
       fair: number;
-      poor: number;
     };
+    reliability: {
+      excellent: number;
+      good: number;
+      fair: number;
+    }
   };
 }
 
-export type MetricKey = 'oee' | 'availability' | 'quality' | 'performance' | 'mtbf' | 'mttr';
+export type MetricKey = 'oee' | 'availability' | 'quality' | 'performance' | 'mtbf' | 'mttr' | 'reliability';
 
-export type LevelKey = 'excellent' | 'good' | 'fair' | 'poor';
+export type LevelKey = 'excellent' | 'good' | 'fair';

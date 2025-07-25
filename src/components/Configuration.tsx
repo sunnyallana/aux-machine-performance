@@ -59,12 +59,13 @@ const Configuration: React.FC = () => {
     // Ensure all required fields exist
     if (!configData.metricsThresholds) {
       configData.metricsThresholds = {
-        oee: { excellent: 85, good: 70, fair: 50, poor: 0 },
-        availability: { excellent: 90, good: 80, fair: 70, poor: 0 },
-        quality: { excellent: 95, good: 90, fair: 85, poor: 0 },
-        performance: { excellent: 90, good: 80, fair: 70, poor: 0 },
-        mtbf: { excellent: 500, good: 300, fair: 150, poor: 0 },
-        mttr: { excellent: 20, good: 40, fair: 60, poor: 100 }
+        oee: { excellent: 85, good: 70, fair: 50},
+        availability: { excellent: 90, good: 80, fair: 70},
+        quality: { excellent: 95, good: 90, fair: 85},
+        performance: { excellent: 90, good: 80, fair: 70},
+        mtbf: { excellent: 500, good: 300, fair: 150},
+        mttr: { excellent: 20, good: 40, fair: 60},
+        reliability: {excellent: 10, good: 5, fair: 2}
       };
     }
 
@@ -855,14 +856,14 @@ const Configuration: React.FC = () => {
             </div>
             
             <div className="space-y-6">
-              {(['oee', 'availability', 'quality', 'performance', 'mtbf', 'mttr'] as MetricKey[]).map(metric => (
+              {(['oee', 'availability', 'quality', 'performance', 'mtbf', 'mttr', 'reliability'] as MetricKey[]).map(metric => (
                 <div key={metric}>
                   <h3 className={`text-md font-medium mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                     {metric.toUpperCase()} Thresholds
                     {['oee', 'availability', 'quality', 'performance'].includes(metric) ? ' (%)' : ' (minutes)'}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    {(['excellent', 'good', 'fair', 'poor'] as LevelKey[]).map(level => (
+                    {(['excellent', 'good', 'fair'] as LevelKey[]).map(level => (
                       <div key={`${metric}-${level}`}>
                         <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                           {level.charAt(0).toUpperCase() + level.slice(1)}
