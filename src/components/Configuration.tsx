@@ -55,26 +55,25 @@ const Configuration: React.FC = () => {
         apiService.getPinMappings()
       ]);
 
-
-    // Ensure all required fields exist
-    if (!configData.metricsThresholds) {
-      configData.metricsThresholds = {
-        oee: { excellent: 85, good: 70, fair: 50},
-        availability: { excellent: 90, good: 80, fair: 70},
-        quality: { excellent: 95, good: 90, fair: 85},
-        performance: { excellent: 90, good: 80, fair: 70},
-        mtbf: { excellent: 500, good: 300, fair: 150},
-        mttr: { excellent: 20, good: 40, fair: 60},
-        reliability: {excellent: 10, good: 5, fair: 2}
-      };
-    }
+      // Ensure all required fields exist
+      if (!configData.metricsThresholds) {
+        configData.metricsThresholds = {
+          oee: { excellent: 85, good: 70, fair: 50},
+          availability: { excellent: 90, good: 80, fair: 70},
+          quality: { excellent: 95, good: 90, fair: 85},
+          performance: { excellent: 90, good: 80, fair: 70},
+          mtbf: { excellent: 500, good: 300, fair: 150},
+          mttr: { excellent: 20, good: 40, fair: 60},
+          reliability: {excellent: 10, good: 5, fair: 2}
+        };
+      }
 
       if (!configData.signalTimeouts) {
-      configData.signalTimeouts = {
-        powerSignalTimeout: 5,
-        cycleSignalTimeout: 2
-      };
-    }
+        configData.signalTimeouts = {
+          powerSignalTimeout: 5,
+          cycleSignalTimeout: 2
+        };
+      }
       
       setConfig(configData);
       setSensors(sensorsData);
@@ -207,7 +206,7 @@ const Configuration: React.FC = () => {
       />
       
       {/* Header */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-4 px-4 sm:px-0">
         <Settings className="h-8 w-8 text-blue-400" />
         <div>
           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>System Configuration</h1>
@@ -215,38 +214,42 @@ const Configuration: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className={`border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-        <nav className="-mb-px flex space-x-8">
+      {/* Tabs - Updated for mobile responsiveness */}
+      <div className={`border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} pb-1 px-2 sm:px-0`}>
+        <nav className="-mb-px flex space-x-1 md:space-x-3 overflow-x-auto scrollbar-thin 
+          ${isDarkMode ? 'scrollbar-thumb-gray-600 scrollbar-track-gray-800' : 'scrollbar-thumb-gray-300 scrollbar-track-gray-100'} 
+          whitespace-nowrap pb-1`}">
           {[
-            { id: 'plc', label: 'PLC Configuration', icon: Cpu },
-            { id: 'email', label: 'Email Settings', icon: Mail },
-            { id: 'signals', label: 'Signal Settings', icon: Settings },
-            { id: 'shifts', label: 'Shift Management', icon: Clock },
-            { id: 'mapping', label: 'Pin Mapping', icon: Link },
-            { id: 'thresholds', label: 'Metrics Thresholds', icon: BarChart2 }
+            { id: 'plc', label: 'PLC', icon: Cpu, fullLabel: 'PLC Configuration' },
+            { id: 'email', label: 'Email', icon: Mail, fullLabel: 'Email Settings' },
+            { id: 'signals', label: 'Signals', icon: Settings, fullLabel: 'Signal Settings' },
+            { id: 'shifts', label: 'Shifts', icon: Clock, fullLabel: 'Shift Management' },
+            { id: 'mapping', label: 'Mapping', icon: Link, fullLabel: 'Pin Mapping' },
+            { id: 'thresholds', label: 'Thresholds', icon: BarChart2, fullLabel: 'Metrics Thresholds' }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+              className={`flex items-center space-x-1 py-2 px-2 md:px-3 border-b-2 font-medium text-xs md:text-sm transition-all ${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-400'
-                  : `border-transparent ${isDarkMode ? 'text-gray-400 hover:text-gray-300 hover:border-gray-300' : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
+                  : `border-transparent ${isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
               }`}
+              aria-label={tab.fullLabel}
             >
-              <tab.icon className="h-4 w-4" />
-              <span>{tab.label}</span>
+              <tab.icon className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.label.charAt(0)}</span>
             </button>
           ))}
         </nav>
       </div>
 
       {/* Tab Content */}
-      <div className="space-y-6 px-4 sm:px-0">
+      <div className="space-y-6 px-2 sm:px-4">
         {/* PLC Configuration */}
         {activeTab === 'plc' && config && (
-          <div className={`rounded-lg border p-6 ${
+          <div className={`rounded-lg border p-4 sm:p-6 ${
             isDarkMode 
               ? 'bg-gray-800 border-gray-700' 
               : 'bg-white border-gray-200 shadow-sm'
@@ -333,7 +336,7 @@ const Configuration: React.FC = () => {
 
         {/* Email Configuration */}
         {activeTab === 'email' && config && (
-          <div className={`rounded-lg border p-6 ${
+          <div className={`rounded-lg border p-4 sm:p-6 ${
             isDarkMode 
               ? 'bg-gray-800 border-gray-700' 
               : 'bg-white border-gray-200 shadow-sm'
@@ -432,7 +435,7 @@ const Configuration: React.FC = () => {
 
         {/* Signal Settings Tab */}
         {activeTab === 'signals' && config && (
-          <div className={`rounded-lg border p-6 ${
+          <div className={`rounded-lg border p-4 sm:p-6 ${
             isDarkMode 
               ? 'bg-gray-800 border-gray-700' 
               : 'bg-white border-gray-200 shadow-sm'
@@ -520,7 +523,7 @@ const Configuration: React.FC = () => {
           return (
             <div className="space-y-6">
               {/* Add New Shift */}
-              <div className={`rounded-lg border p-6 ${
+              <div className={`rounded-lg border p-4 sm:p-6 ${
                 isDarkMode 
                   ? 'bg-gray-800 border-gray-700' 
                   : 'bg-white border-gray-200 shadow-sm'
@@ -679,7 +682,7 @@ const Configuration: React.FC = () => {
         {activeTab === 'mapping' && (
           <div className="space-y-6">
             {/* Add New Mapping */}
-            <div className={`rounded-lg border p-6 ${
+            <div className={`rounded-lg border p-4 sm:p-6 ${
               isDarkMode 
                 ? 'bg-gray-800 border-gray-700' 
                 : 'bg-white border-gray-200 shadow-sm'
@@ -750,7 +753,7 @@ const Configuration: React.FC = () => {
             </div>
 
             {/* Current Mappings */}
-            <div className={`rounded-lg border p-6 ${
+            <div className={`rounded-lg border p-4 sm:p-6 ${
               isDarkMode 
                 ? 'bg-gray-800 border-gray-700' 
                 : 'bg-white border-gray-200 shadow-sm'
@@ -800,7 +803,7 @@ const Configuration: React.FC = () => {
 
             {/* Pin Status Overview */}
             {activeTab === 'mapping' && (
-              <div className={`rounded-lg border p-6 ${
+              <div className={`rounded-lg border p-4 sm:p-6 ${
                 isDarkMode 
                   ? 'bg-gray-800 border-gray-700' 
                   : 'bg-white border-gray-200 shadow-sm'
@@ -841,9 +844,9 @@ const Configuration: React.FC = () => {
           </div>
         )}
 
-        {/* Thresholds */}
+        {/* Metrics Thresholds Tab - Improved Aesthetics */}
         {activeTab === 'thresholds' && config && config.metricsThresholds && (
-          <div className={`rounded-lg border p-6 ${
+          <div className={`rounded-lg border p-4 sm:p-6 ${
             isDarkMode 
               ? 'bg-gray-800 border-gray-700' 
               : 'bg-white border-gray-200 shadow-sm'
@@ -855,46 +858,102 @@ const Configuration: React.FC = () => {
               </h2>
             </div>
             
-            <div className="space-y-6">
-              {(['oee', 'availability', 'quality', 'performance', 'mtbf', 'mttr', 'reliability'] as MetricKey[]).map(metric => (
-                <div key={metric}>
-                  <h3 className={`text-md font-medium mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    {metric.toUpperCase()} Thresholds
-                    {['oee', 'availability', 'quality', 'performance'].includes(metric) ? ' (%)' : ' (minutes)'}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    {(['excellent', 'good', 'fair'] as LevelKey[]).map(level => (
-                      <div key={`${metric}-${level}`}>
-                        <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          {level.charAt(0).toUpperCase() + level.slice(1)}
-                        </label>
-                        <input
-                          type="number"
-                          value={config.metricsThresholds[metric][level]}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value) || 0;
-                            setConfig({
-                              ...config,
-                              metricsThresholds: {
-                                ...config.metricsThresholds,
-                                [metric]: {
-                                  ...config.metricsThresholds[metric],
-                                  [level]: value
-                                }
-                              }
-                            });
-                          }}
-                          className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                            isDarkMode 
-                              ? 'bg-gray-700 border-gray-600 text-white' 
-                              : 'bg-white border-gray-300 text-gray-900'
-                          }`}
-                        />
-                      </div>
-                    ))}
+            <div className="space-y-5">
+              {(['oee', 'availability', 'quality', 'performance', 'mtbf', 'mttr', 'reliability'] as MetricKey[]).map(metric => {
+                const unit = ['oee', 'availability', 'quality', 'performance'].includes(metric) 
+                  ? '%' 
+                  : 'min';
+                  
+                return (
+                  <div 
+                    key={metric}
+                    className={`rounded-lg p-4 border ${
+                      isDarkMode 
+                        ? 'bg-gray-750 border-gray-650' 
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <h3 className={`text-md font-medium mb-3 flex items-center ${
+                      isDarkMode ? 'text-blue-300' : 'text-blue-600'
+                    }`}>
+                      <span className="capitalize">{metric}</span>
+                      <span className="ml-2 text-xs px-2 py-1 rounded ${
+                        isDarkMode 
+                          ? 'bg-blue-900/30 text-blue-200' 
+                          : 'bg-blue-100 text-blue-700'
+                      }">
+                        {unit}
+                      </span>
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {(['excellent', 'good', 'fair'] as LevelKey[]).map((level, idx) => {
+                        // Border colors for visual distinction
+                        const borderColors = [
+                          isDarkMode ? 'border-green-500' : 'border-green-400',
+                          isDarkMode ? 'border-yellow-500' : 'border-yellow-400',
+                          isDarkMode ? 'border-orange-500' : 'border-orange-400'
+                        ];
+                        
+                        return (
+                          <div 
+                            key={`${metric}-${level}`} 
+                            className={`border-l-4 rounded-r p-3 ${
+                              borderColors[idx]
+                            } ${
+                              isDarkMode 
+                                ? 'bg-gray-700' 
+                                : 'bg-white'
+                            }`}
+                          >
+                            <label className={`block text-sm font-medium mb-1 ${
+                              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                            }`}>
+                              <span className="capitalize">{level}</span>
+                              <span className="text-xs ml-1 ${
+                                isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                              }">
+                                ({level === 'excellent' ? '≥' : level === 'good' ? '≥' : '<'})
+                              </span>
+                            </label>
+                            <div className="flex">
+                              <input
+                                type="number"
+                                value={config.metricsThresholds[metric][level]}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  setConfig({
+                                    ...config,
+                                    metricsThresholds: {
+                                      ...config.metricsThresholds,
+                                      [metric]: {
+                                        ...config.metricsThresholds[metric],
+                                        [level]: value
+                                      }
+                                    }
+                                  });
+                                }}
+                                className={`w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                  isDarkMode 
+                                    ? 'bg-gray-600 border-gray-500 text-white' 
+                                    : 'bg-white border-gray-300 text-gray-900'
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    <div className={`text-xs mt-3 ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      {metric === 'mttr' && "Mean Time To Repair (lower is better)"}
+                      {metric === 'mtbf' && "Mean Time Between Failures (higher is better)"}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="mt-6">
@@ -909,7 +968,6 @@ const Configuration: React.FC = () => {
             </div>
           </div>
         )}
-        
       </div>
     </div>
   );
