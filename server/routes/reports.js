@@ -141,7 +141,7 @@ async function generateReport({ type, startDate, endDate, departmentId, machineI
   const shifts = config?.shifts || [];
 
   // Calculate metrics
-  const metrics = calculateMetrics(productionRecords, shifts, startDate, endDate);
+  const { metrics, shiftData, machineData } = await calculateMetrics(productionRecords, shifts);
 
   const report = new Report({
     type,
@@ -149,7 +149,8 @@ async function generateReport({ type, startDate, endDate, departmentId, machineI
     departmentId: departmentId ? new mongoose.Types.ObjectId(departmentId) : undefined,
     machineId: machineId ? new mongoose.Types.ObjectId(machineId) : undefined,
     metrics,
-    shiftData: metrics.shiftData,
+    shiftData,
+    machineData,
     generatedBy
   });
 
@@ -157,7 +158,7 @@ async function generateReport({ type, startDate, endDate, departmentId, machineI
   return report;
 }
 
-function calculateMetrics(productionRecords, shifts) {
+async function calculateMetrics(productionRecords, shifts) {
   let totalUnitsProduced = 0;
   let totalDefectiveUnits = 0;
   let totalRunningMinutes = 0;
@@ -184,6 +185,26 @@ function calculateMetrics(productionRecords, shifts) {
       }
     };
   });
+
+  // Group records by machine
+  const machineMetrics = new Map();
+  productionRecords.forEach(record => {
+    if (!machineMetrics.has(record.machineId)) {
+      machineMetrics.set(record.machineId, []);
+    }
+    machineMetrics.get(record.machineId).push(record);
+  });
+
+  // Calculate metrics for each machine
+  const machineData = [];
+  for (const [machineId, records] of machineMetrics.entries()) {
+    const machineStats = calculateMetricsForRecords(records, shifts);
+    machineData.push({
+      machineId,
+      machineName: records[0].machineId.name,
+      metrics: machineStats
+    });
+  }
 
   productionRecords.forEach(record => {
     totalUnitsProduced += record.unitsProduced || 0;
@@ -268,6 +289,70 @@ function calculateMetrics(productionRecords, shifts) {
   });
 
   return {
+    metrics: {
+      oee: Math.round(oee * 100),
+      mtbf: Math.round(mtbf),
+      mttr: Math.round(mttr),
+      availability: Math.round(availability * 100),
+      quality: Math.round(quality * 100),
+      performance: Math.round(performance * 100),
+      totalUnitsProduced,
+      totalDefectiveUnits,
+      totalRunningMinutes,
+      totalStoppageMinutes,
+      totalStoppages
+    },
+    shiftData,
+    machineData
+  };
+}
+
+function calculateMetricsForRecords(records, shifts) {
+  let totalUnitsProduced = 0;
+  let totalDefectiveUnits = 0;
+  let totalRunningMinutes = 0;
+  let totalStoppageMinutes = 0;
+  let totalExpectedUnits = 0;
+  let totalStoppages = 0;
+  let breakdownStoppages = 0;
+  let totalBreakdownMinutes = 0;
+
+  records.forEach(record => {
+    totalUnitsProduced += record.unitsProduced || 0;
+    totalDefectiveUnits += record.defectiveUnits || 0;
+
+    record.hourlyData.forEach(hourData => {
+      totalRunningMinutes += hourData.runningMinutes || 0;
+      totalStoppageMinutes += hourData.stoppageMinutes || 0;
+      totalStoppages += hourData.stoppages?.length || 0;
+
+      if (hourData.moldId?.productionCapacityPerHour) {
+        const capacityPerMinute = hourData.moldId.productionCapacityPerHour / 60;
+        const expectedUnits = capacityPerMinute * (hourData.runningMinutes || 0);
+        totalExpectedUnits += expectedUnits;
+      }
+
+      hourData.stoppages?.forEach(stoppage => {
+        if (stoppage.reason === 'breakdown') {
+          breakdownStoppages++;
+          totalBreakdownMinutes += stoppage.duration || 0;
+        }
+      });
+    });
+  });
+
+  const totalMinutes = totalRunningMinutes + totalStoppageMinutes;
+  const availability = totalMinutes > 0 ? (totalRunningMinutes / totalMinutes) : 0;
+  const quality = totalUnitsProduced > 0 ? 
+    (totalUnitsProduced - totalDefectiveUnits) / totalUnitsProduced : 0;
+  const performance = totalExpectedUnits > 0 ? 
+    (totalUnitsProduced / totalExpectedUnits) : 0;
+  const oee = availability * quality * performance;
+
+  const mtbf = breakdownStoppages > 0 ? totalRunningMinutes / breakdownStoppages : 0;
+  const mttr = breakdownStoppages > 0 ? totalBreakdownMinutes / breakdownStoppages : 0;
+
+  return {
     oee: Math.round(oee * 100),
     mtbf: Math.round(mtbf),
     mttr: Math.round(mttr),
@@ -278,8 +363,7 @@ function calculateMetrics(productionRecords, shifts) {
     totalDefectiveUnits,
     totalRunningMinutes,
     totalStoppageMinutes,
-    totalStoppages,
-    shiftData
+    totalStoppages
   };
 }
 
@@ -328,6 +412,41 @@ async function emailReport(report) {
 }
 
 function generateEmailHTML(report) {
+  let machineTable = '';
+  if (report.machineData && report.machineData.length > 0) {
+    machineTable = `
+      <h3>Machine Performance</h3>
+      <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th>Machine</th>
+            <th>OEE</th>
+            <th>Availability</th>
+            <th>Quality</th>
+            <th>Performance</th>
+            <th>Units</th>
+            <th>Defects</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    
+    report.machineData.forEach(machine => {
+      const m = machine.metrics;
+      machineTable += `
+        <tr>
+          <td>${machine.machineName || 'Unknown'}</td>
+          <td>${m.oee}%</td>
+          <td>${m.availability}%</td>
+          <td>${m.quality}%</td>
+          <td>${m.performance}%</td>
+          <td>${m.totalUnitsProduced.toLocaleString()}</td>
+          <td>${m.totalDefectiveUnits.toLocaleString()}</td>
+        </tr>`;
+    });
+    
+    machineTable += `</tbody></table>`;
+  }
+  
   return `
     <h2>${report.type.toUpperCase()} Production Report</h2>
     <p><strong>Period:</strong> ${report.period.start.toDateString()} to ${report.period.end.toDateString()}</p>
@@ -338,9 +457,11 @@ function generateEmailHTML(report) {
       <li><strong>OEE:</strong> ${report.metrics.oee}%</li>
       <li><strong>MTBF:</strong> ${report.metrics.mtbf} minutes</li>
       <li><strong>MTTR:</strong> ${report.metrics.mttr} minutes</li>
-      <li><strong>Total Units Produced:</strong> ${report.metrics.totalUnitsProduced}</li>
-      <li><strong>Defective Units:</strong> ${report.metrics.totalDefectiveUnits}</li>
+      <li><strong>Total Units Produced:</strong> ${report.metrics.totalUnitsProduced.toLocaleString()}</li>
+      <li><strong>Defective Units:</strong> ${report.metrics.totalDefectiveUnits.toLocaleString()}</li>
     </ul>
+    
+    ${machineTable}
     
     <p>Please find the detailed PDF report attached.</p>
   `;
@@ -642,7 +763,76 @@ async function generatePDF(report) {
            .text(`● Stoppage: ${formatTime(report.metrics.totalStoppageMinutes)} (${Math.round(stoppagePercent)}%)`, rightCol, rightY + 12);
       }
 
-      // Footer - positioned at bottom of page
+      // === MACHINE PERFORMANCE TABLE ===
+      if (report.machineData && report.machineData.length > 0) {
+        doc.addPage();
+        doc.fontSize(16).fillColor('#1e40af').text('MACHINE PERFORMANCE', { align: 'center' });
+        doc.moveDown(0.5);
+        
+        // Table headers
+        const headers = ['Machine', 'OEE', 'Availability', 'Quality', 'Performance', 'Units', 'Defects'];
+        const columnWidths = [120, 50, 80, 60, 80, 60, 60];
+        const startYNew = doc.y;
+        
+        // Draw header row
+        doc.font('Helvetica-Bold').fontSize(9);
+        let x = 40;
+        headers.forEach((header, i) => {
+          doc.text(header, x, startYNew, { width: columnWidths[i], align: 'center' });
+          x += columnWidths[i];
+        });
+        
+        // Draw line under header
+        doc.moveTo(40, startYNew + 15)
+           .lineTo(doc.page.width - 40, startYNew + 15)
+           .stroke();
+        
+        // Machine rows
+        doc.font('Helvetica').fontSize(8);
+        let currentYNew = startYNew + 20;
+        
+        report.machineData.forEach(machine => {
+          const metrics = machine.metrics;
+          x = 40;
+          
+          // Machine name
+          doc.text(machine.machineName || 'Unknown', x, currentYNew, { width: columnWidths[0] });
+          x += columnWidths[0];
+          
+          // OEE with color coding
+          const oeeColor = getOEEColor(metrics.oee, config);
+          doc.fillColor(oeeColor).text(`${metrics.oee}%`, x, currentYNew, { width: columnWidths[1], align: 'center' });
+          x += columnWidths[1];
+          
+          // Availability
+          doc.fillColor('#000000').text(`${metrics.availability}%`, x, currentYNew, { width: columnWidths[2], align: 'center' });
+          x += columnWidths[2];
+          
+          // Quality
+          doc.text(`${metrics.quality}%`, x, currentYNew, { width: columnWidths[3], align: 'center' });
+          x += columnWidths[3];
+          
+          // Performance
+          doc.text(`${metrics.performance}%`, x, currentYNew, { width: columnWidths[4], align: 'center' });
+          x += columnWidths[4];
+          
+          // Units
+          doc.text(metrics.totalUnitsProduced.toLocaleString(), x, currentYNew, { width: columnWidths[5], align: 'center' });
+          x += columnWidths[5];
+          
+          // Defects
+          doc.text(metrics.totalDefectiveUnits.toLocaleString(), x, currentYNew, { width: columnWidths[6], align: 'center' });
+          
+          // Draw row separator
+          doc.moveTo(40, currentYNew + 15)
+             .lineTo(doc.page.width - 40, currentYNew + 15)
+             .strokeColor('#e5e7eb').lineWidth(0.5).stroke();
+          
+          currentYNew += 20;
+        });
+      }
+
+      // Footer
       doc.fontSize(7).fillColor('#9ca3af').font('Helvetica')
          .text('Dawlance - LineSentry', 40, doc.page.height - 30)
          .text(`Generated: ${new Date().toLocaleString()}`, 40, doc.page.height - 30, { 
@@ -657,7 +847,7 @@ async function generatePDF(report) {
   });
 }
 
-// Updated helper functions (synchronous)
+// Helper functions
 function getOEEColor(oee, config) {
   if (!config?.metricsThresholds?.oee) return '#ef4444';
   if (oee >= config.metricsThresholds.oee.excellent) return '#10b981';
@@ -675,7 +865,7 @@ function getOEEStatus(oee, config) {
 }
 
 function getShiftColor(index) {
-  const colors = ['#3b82f6', '#8b5cf6', '#06b6d4']; // Blue, Purple, Cyan
+  const colors = ['#3b82f6', '#8b5cf6', '#06b6d4'];
   return colors[index % colors.length];
 }
 

@@ -31,6 +31,27 @@ const reportSchema = new mongoose.Schema({
     totalStoppageMinutes: { type: Number, default: 0 },
     totalStoppages: { type: Number, default: 0 }
   },
+   machineData: [{
+    machineId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Machine',
+      required: true
+    },
+    machineName: String,
+    metrics: {
+      oee: Number,
+      mtbf: Number,
+      mttr: Number,
+      availability: Number,
+      quality: Number,
+      performance: Number,
+      totalUnitsProduced: Number,
+      totalDefectiveUnits: Number,
+      totalRunningMinutes: Number,
+      totalStoppageMinutes: Number,
+      totalStoppages: Number
+    }
+  }],
   shiftData: [{
     shiftName: String,
     startTime: String,
