@@ -6,7 +6,7 @@ const router = express.Router();
 
 
 // Get all users
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, adminAuth, async (req, res) => {
   try {
     const users = await User.find({})
       .populate('departmentId', 'name _id')
@@ -16,7 +16,6 @@ router.get('/', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-
 
 // Create user (Admin only)
 router.post('/', auth, adminAuth, async (req, res) => {
