@@ -4,7 +4,6 @@ const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-
 // Get all users
 router.get('/', auth, adminAuth, async (req, res) => {
   try {
@@ -36,7 +35,7 @@ router.post('/', auth, adminAuth, async (req, res) => {
     const user = new User(userData);
     await user.save();
     
-    // Return user without password
+    // Return user without password 
     const userWithoutPassword = user.toObject();
     delete userWithoutPassword.password;
     

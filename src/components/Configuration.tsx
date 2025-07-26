@@ -844,7 +844,7 @@ const Configuration: React.FC = () => {
           </div>
         )}
 
-        {/* Metrics Thresholds Tab - Improved Aesthetics */}
+        {/* Metrics Thresholds Tab */}
         {activeTab === 'thresholds' && config && config.metricsThresholds && (
           <div className={`rounded-lg border p-4 sm:p-6 ${
             isDarkMode 
@@ -869,7 +869,7 @@ const Configuration: React.FC = () => {
                     key={metric}
                     className={`rounded-lg p-4 border ${
                       isDarkMode 
-                        ? 'bg-gray-750 border-gray-650' 
+                        ? 'bg-gray-750 border-gray-600' 
                         : 'bg-gray-50 border-gray-200'
                     }`}
                   >
@@ -913,7 +913,7 @@ const Configuration: React.FC = () => {
                               <span className="text-xs ml-1 ${
                                 isDarkMode ? 'text-gray-400' : 'text-gray-500'
                               }">
-                                ({level === 'excellent' ? '≥' : level === 'good' ? '≥' : '<'})
+                                ({level === 'excellent' ? '≥' : level === 'good' ? '≥' : level === 'fair'  ? '≥' : '<'})
                               </span>
                             </label>
                             <div className="flex">
