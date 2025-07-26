@@ -48,6 +48,10 @@ class ApiService {
     return response;
   }
 
+  async getCurrentOperator() {
+    return this.request('/users/me/operator');
+  }
+
   async getCurrentUser() {
     return this.request('/auth/me');
   }

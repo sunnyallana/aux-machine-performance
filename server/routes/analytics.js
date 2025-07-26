@@ -433,6 +433,10 @@ router.post('/production-assignment', auth, async (req, res) => {
       }
     }
 
+    if (req.user.role === 'operator' && operatorId !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Operators can only assign themselves' });
+    }
+
     // Update each hour in the range
     for (const targetHour of hoursToUpdate) {
       // Find or create hourly data

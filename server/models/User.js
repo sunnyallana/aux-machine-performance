@@ -48,6 +48,18 @@ const userSchema = new mongoose.Schema({
   }
 });
 
+userSchema.virtual('id').get(function() {
+  return this._id.toHexString();
+});
+
+userSchema.set('toJSON', {
+  virtuals: true,
+  transform: function(doc, ret) {
+    delete ret._id;
+    delete ret.__v;
+  }
+});
+
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   

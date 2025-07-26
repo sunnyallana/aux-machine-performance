@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useAuth } from '../context/AuthContext';
 
 interface ProductionTimelineProps {
   data: ProductionTimelineDay[];
@@ -55,6 +56,8 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   shifts = []
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'stoppage' | 'assignment'>('details');
+  const { user: currentUser } = useAuth();
+  
   const [stoppageForm, setStoppageForm] = useState({
     reason: '',
     description: '',
@@ -62,13 +65,15 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
     sapNotificationNumber: ''
   });
   const [assignmentForm, setAssignmentForm] = useState({
-    operatorId: hour.operator?._id || hour.operator?.id || '',
-    moldId: hour.mold?._id || '',
-    defectiveUnits: hour.defectiveUnits || 0
+    operatorId: currentUser?.role === 'operator' 
+    ? (currentUser._id || currentUser.id || '')
+    : (hour.operator?._id || hour.operator?.id || ''),
+  moldId: hour.mold?._id || '',
+  defectiveUnits: hour.defectiveUnits || 0
   });
   const [applyToShift, setApplyToShift] = useState(false);
   const [shiftInfo, setShiftInfo] = useState<{name: string; hours: number[]} | null>(null);
-
+  
   // Check for pending stoppages
   const pendingStoppage = hour.stoppages.find(s => s.reason === 'unclassified' || (s as any).isPending);
 
@@ -177,12 +182,16 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   const handleAssignmentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const operatorId = currentUser?.role === 'operator'
+    ? (currentUser._id || currentUser.id || '')
+    : assignmentForm.operatorId;
+
     try {
       await apiService.updateProductionAssignment({
         machineId,
         hour: hour.hour,
         date,
-        operatorId: assignmentForm.operatorId || null,
+        operatorId: operatorId || null,
         moldId: assignmentForm.moldId || null,
         defectiveUnits: assignmentForm.defectiveUnits,
         applyToShift: shiftInfo ? applyToShift : false
@@ -205,7 +214,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       date,
       hours: applyToShift && shiftInfo ? shiftInfo.hours : [hour.hour],
       originalHour: hour.hour,
-      operatorId: assignmentForm.operatorId,
+      operatorId: operatorId,
       moldId: assignmentForm.moldId,
       defectiveUnits: assignmentForm.defectiveUnits
     });
@@ -438,6 +447,12 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Operator
                 </label>
+
+                {currentUser?.role === 'operator' ? (
+                  <div className="text-sm text-white p-2 bg-blue-800 rounded">
+                    {currentUser.username} (You)
+                  </div>
+                ) : (
                 <select
                   value={assignmentForm.operatorId}
                   onChange={(e) => setAssignmentForm({...assignmentForm, operatorId: e.target.value})}
@@ -450,6 +465,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                     </option>
                   ))}
                 </select>
+                )}
               </div>
 
               <div>
@@ -667,6 +683,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   const [machineStatus, setMachineStatus] = useState<string>('inactive');
   const [machineColor, setMachineColor] = useState<string>('gray');
   const [shifts, setShifts] = useState<any[]>([]);
+  const { user: currentUser } = useAuth();
 
   // Update current time every minute
   useEffect(() => {
@@ -951,33 +968,44 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [operators, molds] = await Promise.all([
-          apiService.getUsers(),
-          apiService.getMolds()
-        ]);
-        setAvailableOperators(operators.filter((u: any) => u.role === 'operator'));
+        let operators: User[] = [];
+        if (currentUser?.role === 'admin') {
+          operators = await apiService.getUsers();
+        } else {
+          // Fetch only current operator
+          const operator = await apiService.getCurrentOperator();
+          operators = [operator];
+        }
+        
+        operators = operators.filter(u => u.role === 'operator');
+        const molds = await apiService.getMolds();
+        
+        setAvailableOperators(operators);
         setAvailableMolds(molds);
       } catch (error) {
         console.error('Failed to fetch operators and molds:', error);
       }
     };
-
     fetchData();
-  }, []);
+  }, [currentUser]);
+
 
   // Fetch shifts
   useEffect(() => {
-    const fetchShifts = async () => {
-      try {
+  const fetchShifts = async () => {
+    try {
+      // Only fetch shifts for admin users
+      if (currentUser?.role === 'admin') {
         const config = await apiService.getConfig();
         setShifts(config.shifts || []);
-      } catch (error) {
-        console.error('Failed to fetch shifts:', error);
       }
-    };
-    
-    fetchShifts();
-  }, []);
+    } catch (error) {
+      console.error('Failed to fetch shifts:', error);
+    }
+  };
+  
+  fetchShifts();
+}, [currentUser]);
 
   // Filter data based on view mode and current time
    const getFilteredData = useCallback(() => {
@@ -1394,6 +1422,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       {/* Production Modal */}
       {selectedHour && (
         <ProductionModal
+          key={`${selectedHour.date}-${selectedHour.hour.hour}`}
           isOpen={true}
           onClose={() => setSelectedHour(null)}
           hour={selectedHour.hour}

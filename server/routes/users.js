@@ -4,6 +4,23 @@ const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+
+// Get current operator (for self-assignment)
+router.get('/me/operator', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('-password -isActive -email');
+      
+    if (!user || user.role !== 'operator') {
+      return res.status(403).json({ message: 'Operator access required' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Get all users
 router.get('/', auth, adminAuth, async (req, res) => {
   try {

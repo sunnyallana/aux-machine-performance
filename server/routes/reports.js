@@ -490,7 +490,7 @@ async function generatePDF(report) {
       const pageHeight = doc.page.height - 80;
 
       // Header with logo (compact)
-      const logoPath = path.join(__dirname, '../assets/dawlance-logo.png');
+      const logoPath = path.join(__dirname, '../../public/assets/dawlance-logo.png');
       if (fs.existsSync(logoPath)) {
         doc.image(logoPath, 
           doc.page.width / 2 - 100,
