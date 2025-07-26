@@ -200,6 +200,10 @@ class ApiService {
     return this.request('/config');
   }
 
+  async getShifts() {
+  return this.request('/config/shifts');
+}
+
   async updateConfig(config: any) {
     return this.request('/config', {
       method: 'PUT',

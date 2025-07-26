@@ -4,6 +4,20 @@ const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Route for fetching shift details (accessible to any authenticated user)
+router.get('/shifts', auth, async (req, res) => {
+  try {
+    const config = await Config.findOne().select('shifts -_id');
+    if (!config) {
+      return res.json({ shifts: [] });
+    }
+    res.json(config.shifts);
+  } catch (error) { 
+    console.error('Shift config fetch error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Get configuration
 router.get('/', auth, adminAuth, async (req, res) => {
   try {

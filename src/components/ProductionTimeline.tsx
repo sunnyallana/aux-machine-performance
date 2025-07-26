@@ -994,11 +994,8 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   useEffect(() => {
   const fetchShifts = async () => {
     try {
-      // Only fetch shifts for admin users
-      if (currentUser?.role === 'admin') {
-        const config = await apiService.getConfig();
-        setShifts(config.shifts || []);
-      }
+        const shifts = await apiService.getShifts();
+        setShifts(shifts || []);
     } catch (error) {
       console.error('Failed to fetch shifts:', error);
     }
