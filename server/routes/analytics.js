@@ -336,13 +336,14 @@ router.post('/stoppage', auth, async (req, res) => {
 });
 
 // Update production assignment
+// Update production assignment
 router.post('/production-assignment', auth, async (req, res) => {
   try {
     const { machineId, hour, date, operatorId, moldId, defectiveUnits, applyToShift } = req.body;
     const io = req.app.get('io');
     
     // Validate and convert operatorId to ObjectId if provided
-    let validOperatorId = null;
+    let validOperatorId = undefined;
     
     if (operatorId && operatorId.trim() !== '') {
       // Check if it's already a valid ObjectId
@@ -361,7 +362,7 @@ router.post('/production-assignment', auth, async (req, res) => {
     }
 
     // Validate and convert moldId to ObjectId if provided
-    let validMoldId = null;
+    let validMoldId = undefined;
     if (moldId && moldId.trim() !== '') {
       if (mongoose.Types.ObjectId.isValid(moldId)) {
         validMoldId = new mongoose.Types.ObjectId(moldId);
@@ -433,8 +434,14 @@ router.post('/production-assignment', auth, async (req, res) => {
       }
     }
 
-    if (req.user.role === 'operator' && operatorId !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Operators can only assign themselves' });
+    // Permission check for operators
+    if (req.user.role === 'operator') {
+      const currentUserId = req.user._id.toString();
+      
+      // Operators can only assign themselves
+      if (validOperatorId && validOperatorId.toString() !== currentUserId) {
+        return res.status(403).json({ message: 'Operators can only assign themselves' });
+      }
     }
 
     // Update each hour in the range
@@ -451,15 +458,25 @@ router.post('/production-assignment', auth, async (req, res) => {
           stoppageMinutes: 0,
           stoppages: [],
         };
-
-        if (validOperatorId) hourData.operatorId = validOperatorId;
-        if (validMoldId) hourData.moldId = validMoldId;
-
         productionRecord.hourlyData.push(hourData);
       }
 
-      if (validOperatorId) hourData.operatorId = validOperatorId;
-      if (validMoldId) hourData.moldId = validMoldId;
+      // Update or remove assignments
+      if (validOperatorId !== undefined) {
+        hourData.operatorId = validOperatorId;
+      } else {
+        // Unassign operator by removing the field
+        hourData.operatorId = undefined;
+        delete hourData.operatorId;
+      }
+      
+      if (validMoldId !== undefined) {
+        hourData.moldId = validMoldId;
+      } else {
+        // Unassign mold by removing the field
+        hourData.moldId = undefined;
+        delete hourData.moldId;
+      }
       
       // Only update defective units for the original hour
       if (targetHour === hour && defectiveUnits !== undefined) {
@@ -481,8 +498,8 @@ router.post('/production-assignment', auth, async (req, res) => {
       machineId,
       hours: hoursToUpdate,
       date,
-      operatorId: validOperatorId,
-      moldId: validMoldId,
+      operatorId: validOperatorId || null,
+      moldId: validMoldId || null,
       originalHour: hour,
       defectiveUnits: hour === hour ? defectiveUnits : undefined,
       timestamp: new Date()

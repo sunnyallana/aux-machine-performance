@@ -182,17 +182,16 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   const handleAssignmentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const operatorId = currentUser?.role === 'operator'
-    ? (currentUser._id || currentUser.id || '')
-    : assignmentForm.operatorId;
+    const operatorId = assignmentForm.operatorId === '' ? null : assignmentForm.operatorId;
+    const moldId = assignmentForm.moldId === '' ? null : assignmentForm.moldId;
 
     try {
       await apiService.updateProductionAssignment({
         machineId,
         hour: hour.hour,
         date,
-        operatorId: operatorId || null,
-        moldId: assignmentForm.moldId || null,
+        operatorId,
+        moldId,
         defectiveUnits: assignmentForm.defectiveUnits,
         applyToShift: shiftInfo ? applyToShift : false
       });
@@ -448,11 +447,6 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                   Operator
                 </label>
 
-                {currentUser?.role === 'operator' ? (
-                  <div className="text-sm text-white p-2 bg-blue-800 rounded">
-                    {currentUser.username} (You)
-                  </div>
-                ) : (
                 <select
                   value={assignmentForm.operatorId}
                   onChange={(e) => setAssignmentForm({...assignmentForm, operatorId: e.target.value})}
@@ -465,7 +459,6 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                     </option>
                   ))}
                 </select>
-                )}
               </div>
 
               <div>
@@ -881,21 +874,25 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
               }
 
               if (hourIndex >= 0) {
-                if (update.operatorId) {
+                if (update.operatorId !== null) {
                   const operator = availableOperators.find(op => 
                     op._id === update.operatorId || op.id === update.operatorId
                   );
                   if (operator) {
                     newData[dayIndex].hours[hourIndex].operator = operator;
                   }
+                } else {
+                    newData[dayIndex].hours[hourIndex].operator = undefined;
                 }
                 
-                if (update.moldId) {
+                if (update.moldId !== null) {
                   const mold = availableMolds.find(m => m._id === update.moldId);
                   if (mold) {
                     newData[dayIndex].hours[hourIndex].mold = mold;
                   }
-                }
+                } else {
+                    newData[dayIndex].hours[hourIndex].mold = undefined;
+                  }
                 
                 // Only update defective units for the original hour
                 if (targetHour === update.originalHour && update.defectiveUnits !== undefined) {
@@ -904,7 +901,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
               }
             });
           }
-          
           return newData;
         });
       }
