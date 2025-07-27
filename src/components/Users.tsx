@@ -159,10 +159,10 @@ const Users: React.FC = () => {
         updateData.departmentId = undefined;
       }
 
-      const updatedUser = await apiService.updateUser(editingUser._id, updateData);
+      const updatedUser = await apiService.updateUser(editingUser.id, updateData);
       
       setUsers(users.map(user => 
-        user._id === editingUser._id ? updatedUser : user
+        user.id === editingUser.id ? updatedUser : user
       ));
       setEditingUser(null);
       toast.success("User updated successfully");
@@ -193,7 +193,7 @@ const Users: React.FC = () => {
         isActive: !isActive 
       });
       setUsers(users.map(user => 
-        user._id === id ? updatedUser : user
+        user.id === id ? updatedUser : user
       ));
       toast.success(`User ${!isActive ? 'activated' : 'deactivated'} successfully`);
     } catch (err) {
@@ -209,7 +209,7 @@ const Users: React.FC = () => {
       try {
         setDeletingId(id);
         await apiService.deleteUser(id);
-        setUsers(users.filter(user => user._id !== id));
+        setUsers(users.filter(user => user.id !== id));
         toast.success("User deleted successfully");
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to delete user';
@@ -714,7 +714,7 @@ const Users: React.FC = () => {
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
                   <tr 
-                    key={user._id} 
+                    key={user.id} 
                     className={`${!user.isActive ? 'opacity-70' : ''} ${
                       isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'
                     }`}
@@ -806,17 +806,17 @@ const Users: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleToggleStatus(user._id, user.isActive);
+                              handleToggleStatus(user.id, user.isActive);
                             }}
-                            disabled={statusTogglingId === user._id}
+                            disabled={statusTogglingId === user.id}
                             className={`p-1 rounded-md ${
                               user.isActive 
                                 ? (isDarkMode ? 'text-yellow-400 hover:text-yellow-300 hover:bg-gray-700' : 'text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50')
                                 : (isDarkMode ? 'text-green-400 hover:text-green-300 hover:bg-gray-700' : 'text-green-500 hover:text-green-700 hover:bg-green-50')
-                            } ${statusTogglingId === user._id ? 'opacity-50' : ''}`}
+                            } ${statusTogglingId === user.id ? 'opacity-50' : ''}`}
                             title={user.isActive ? 'Deactivate' : 'Activate'}
                           >
-                            {statusTogglingId === user._id ? (
+                            {statusTogglingId === user.id ? (
                               <Loader className="h-4 w-4 animate-spin" />
                             ) : user.isActive ? (
                               <PowerOff className="h-4 w-4" />
@@ -827,19 +827,19 @@ const Users: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteUser(user._id);
+                              handleDeleteUser(user.id);
                             }}
-                            disabled={deletingId === user._id}
+                            disabled={deletingId === user.id}
                             className={`p-1 rounded-md ${
                               isDarkMode 
                                 ? 'text-red-400 hover:text-red-300 hover:bg-gray-700' 
                                 : 'text-red-500 hover:text-red-700 hover:bg-red-50'
                             } ${
-                              deletingId === user._id ? 'opacity-50' : ''
+                              deletingId === user.id ? 'opacity-50' : ''
                             }`}
                             title="Delete permanently"
                           >
-                            {deletingId === user._id ? (
+                            {deletingId === user.id ? (
                               <Loader className="h-4 w-4 animate-spin" />
                             ) : (
                               <Trash2 className="h-4 w-4" />
@@ -851,7 +851,7 @@ const Users: React.FC = () => {
                   </tr>
                 ))
               ) : (
-                <tr>
+                <tr key="no-users">
                   <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <UserIcon className={`h-12 w-12 mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />

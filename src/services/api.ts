@@ -137,9 +137,6 @@ class ApiService {
     });
   }
 
-
-  
-
   // Users
   async getUsers() {
     return this.request('/users');
