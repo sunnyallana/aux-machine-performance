@@ -170,7 +170,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 ${ isOperator ? 'md:grid-cols-3': 'md:grid-cols-4' } gap-4`}>
         <div className={`p-6 rounded-lg border ${
           isDarkMode 
             ? 'bg-gray-800 border-gray-700' 
@@ -205,7 +205,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className={`p-6 rounded-lg border ${
+       {!isOperator && <div className={`p-6 rounded-lg border ${
           isDarkMode 
             ? 'bg-gray-800 border-gray-700' 
             : 'bg-white border-gray-200 shadow-sm'
@@ -220,6 +220,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        }
 
         <div className={`p-6 rounded-lg border ${
           isDarkMode 
