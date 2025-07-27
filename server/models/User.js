@@ -75,4 +75,13 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
+userSchema.pre('remove', async function(next) {
+  // Set generatedBy to null when user is deleted
+  await mongoose.model('Report').updateMany(
+    { generatedBy: this._id },
+    { $set: { generatedBy: null } }
+  );
+  next();
+});
+
 module.exports = mongoose.model('User', userSchema);
