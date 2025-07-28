@@ -11,9 +11,7 @@ import {
   PowerOff,
   Search,
   Loader,
-  PackageOpen,
-  X,
-  Save
+  PackageOpen
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -63,7 +61,6 @@ const Molds: React.FC = () => {
         }
         return mold;
       });
-
       
       setMolds(enrichedMolds);
       setDepartments(departmentsData);
@@ -252,12 +249,12 @@ const Molds: React.FC = () => {
         theme="dark"
       />
       
-      {/* Header */}
+      {/* Header - Matches Departments */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <PackageOpen className="h-8 w-8 text-blue-400" />
           <div>
-            <h1 className="text-2xl font-bold text-white">Mold Management</h1>
+            <h1 className="text-2xl font-bold text-white">Molds</h1>
             <p className="text-gray-400">Manage and configure production molds</p>
           </div>
         </div>
@@ -280,29 +277,68 @@ const Molds: React.FC = () => {
             onClick={() => setIsCreating(true)}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
           >
-            <Plus className="h-4 w-4" />
-            <span>Add Mold</span>
+            <Plus className="h-5 w-5" />
+            <span>New Mold</span>
           </button>
+        </div>
+      </div>
+
+      {/* Stats - Matches Departments */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-400">Total Molds</p>
+              <p className="text-xl font-semibold text-white">{molds.length}</p>
+            </div>
+            <PackageOpen className="h-8 w-8 text-blue-400" />
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-400">Active Molds</p>
+              <p className="text-xl font-semibold text-green-400">
+                {molds.filter(m => m.isActive).length}
+              </p>
+            </div>
+            <Power className="h-8 w-8 text-green-400" />
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-400">Inactive Molds</p>
+              <p className="text-xl font-semibold text-red-400">
+                {molds.filter(m => !m.isActive).length}
+              </p>
+            </div>
+            <PowerOff className="h-8 w-8 text-red-400" />
+          </div>
         </div>
       </div>
 
       {/* Create Mold Modal */}
       {isCreating && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-6 border-b border-gray-700">
-              <h3 className="text-lg font-semibold text-white">Create New Mold</h3>
-              <button
-                onClick={() => setIsCreating(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Create New Mold</h3>
+                <button 
+                  onClick={() => setIsCreating(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  &times;
+                </button>
+              </div>
             </div>
-
+            
             <form onSubmit={handleCreateMold} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Mold Name *
                 </label>
                 <input
@@ -311,13 +347,13 @@ const Molds: React.FC = () => {
                   required
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter mold name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Description
                 </label>
                 <textarea
@@ -325,13 +361,13 @@ const Molds: React.FC = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter mold description"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Production Capacity (units/hour) *
                 </label>
                 <input
@@ -341,13 +377,13 @@ const Molds: React.FC = () => {
                   min="1"
                   value={formData.productionCapacityPerHour}
                   onChange={handleNumberInputChange}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter production capacity"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Department *
                 </label>
                 <select
@@ -355,7 +391,7 @@ const Molds: React.FC = () => {
                   required
                   value={formData.departmentId}
                   onChange={handleInputChange}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select department</option>
                   {departments.map((dept) => (
@@ -367,7 +403,7 @@ const Molds: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Active Status
                 </label>
                 <div className="flex items-center">
@@ -386,21 +422,20 @@ const Molds: React.FC = () => {
                   </label>
                 </div>
               </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  <PackagePlus className="h-4 w-4" />
-                  <span>Create Mold</span>
-                </button>
+              
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsCreating(false)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Create Mold
                 </button>
               </div>
             </form>
@@ -410,21 +445,23 @@ const Molds: React.FC = () => {
 
       {/* Edit Mold Modal */}
       {editingMold && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-6 border-b border-gray-700">
-              <h3 className="text-lg font-semibold text-white">Edit Mold</h3>
-              <button
-                onClick={() => setEditingMold(null)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Edit Mold</h3>
+                <button 
+                  onClick={() => setEditingMold(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  &times;
+                </button>
+              </div>
             </div>
-
+            
             <form onSubmit={handleUpdateMold} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Mold Name *
                 </label>
                 <input
@@ -433,13 +470,13 @@ const Molds: React.FC = () => {
                   required
                   value={editingMold.name}
                   onChange={handleInputChange}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter mold name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Description
                 </label>
                 <textarea
@@ -447,13 +484,13 @@ const Molds: React.FC = () => {
                   value={editingMold.description || ''}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter mold description"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Production Capacity (units/hour) *
                 </label>
                 <input
@@ -463,13 +500,13 @@ const Molds: React.FC = () => {
                   min="1"
                   value={editingMold.productionCapacityPerHour}
                   onChange={handleNumberInputChange}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter production capacity"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Department *
                 </label>
                 <select
@@ -479,7 +516,7 @@ const Molds: React.FC = () => {
                     ? editingMold.departmentId 
                     : editingMold.departmentId._id}
                   onChange={handleInputChange}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select department</option>
                   {departments.map((dept) => (
@@ -491,7 +528,7 @@ const Molds: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Active Status
                 </label>
                 <div className="flex items-center">
@@ -510,21 +547,20 @@ const Molds: React.FC = () => {
                   </label>
                 </div>
               </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>Update Mold</span>
-                </button>
+              
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setEditingMold(null)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Update Mold
                 </button>
               </div>
             </form>
@@ -532,18 +568,17 @@ const Molds: React.FC = () => {
         </div>
       )}
 
-      {/* Molds List */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">Production Molds</h2>
-        </div>
-
+      {/* Molds Table - Matches Departments */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-700">
             <thead className="bg-gray-750">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Mold
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Description
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Department
@@ -554,15 +589,20 @@ const Molds: React.FC = () => {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Status
                 </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Actions
-                </th>
+                {isAdmin && (
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-gray-800 divide-y divide-gray-700">
               {filteredMolds.length > 0 ? (
                 filteredMolds.map((mold) => (
-                  <tr key={mold._id} className="hover:bg-gray-750">
+                  <tr 
+                    key={mold._id} 
+                    className={`hover:bg-gray-750 ${!mold.isActive ? 'opacity-70' : ''}`}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center ${
@@ -574,10 +614,12 @@ const Molds: React.FC = () => {
                           <div className="text-sm font-medium text-white">
                             {mold.name}
                           </div>
-                          <div className="text-xs text-gray-400 line-clamp-1">
-                            {mold.description || 'No description'}
-                          </div>
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-300 max-w-md truncate">
+                        {mold.description || 'No description'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -597,62 +639,63 @@ const Molds: React.FC = () => {
                         {mold.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => {
-                            // Ensure departmentId is a string for editing
-                            setEditingMold({
-                              ...mold,
-                              departmentId: typeof mold.departmentId === 'object' 
-                                ? mold.departmentId._id 
-                                : mold.departmentId
-                            });
-                          }}
-                          className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(mold._id, mold.isActive)}
-                          disabled={statusTogglingId === mold._id}
-                          className={`p-1 rounded-md hover:bg-gray-700 ${
-                            mold.isActive 
-                              ? 'text-yellow-400 hover:text-yellow-300' 
-                              : 'text-green-400 hover:text-green-300'
-                          } ${statusTogglingId === mold._id ? 'opacity-50' : ''}`}
-                          title={mold.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          {statusTogglingId === mold._id ? (
-                            <Loader className="h-4 w-4 animate-spin" />
-                          ) : mold.isActive ? (
-                            <PowerOff className="h-4 w-4" />
-                          ) : (
-                            <Power className="h-4 w-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(mold._id)}
-                          disabled={deletingId === mold._id}
-                          className={`text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700 ${
-                            deletingId === mold._id ? 'opacity-50' : ''
-                          }`}
-                          title="Delete"
-                        >
-                          {deletingId === mold._id ? (
-                            <Loader className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => {
+                              setEditingMold({
+                                ...mold,
+                                departmentId: typeof mold.departmentId === 'object' 
+                                  ? mold.departmentId._id 
+                                  : mold.departmentId
+                              });
+                            }}
+                            className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleStatus(mold._id, mold.isActive)}
+                            disabled={statusTogglingId === mold._id}
+                            className={`p-1 rounded-md hover:bg-gray-700 ${
+                              mold.isActive 
+                                ? 'text-yellow-400 hover:text-yellow-300' 
+                                : 'text-green-400 hover:text-green-300'
+                            } ${statusTogglingId === mold._id ? 'opacity-50' : ''}`}
+                            title={mold.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            {statusTogglingId === mold._id ? (
+                              <Loader className="h-4 w-4 animate-spin" />
+                            ) : mold.isActive ? (
+                              <PowerOff className="h-4 w-4" />
+                            ) : (
+                              <Power className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(mold._id)}
+                            disabled={deletingId === mold._id}
+                            className={`text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700 ${
+                              deletingId === mold._id ? 'opacity-50' : ''
+                            }`}
+                            title="Delete"
+                          >
+                            {deletingId === mold._id ? (
+                              <Loader className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <PackageOpen className="h-12 w-12 text-gray-600 mb-4" />
                       <h3 className="text-lg font-medium text-gray-400 mb-2">No molds found</h3>
@@ -661,12 +704,14 @@ const Molds: React.FC = () => {
                           ? `No molds match your search for "${searchTerm}"` 
                           : 'Get started by creating your first mold'}
                       </p>
-                      <button 
-                        onClick={() => setIsCreating(true)}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                      >
-                        Create Mold
-                      </button>
+                      {isAdmin && !searchTerm && (
+                        <button 
+                          onClick={() => setIsCreating(true)}
+                          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                          Create Mold
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

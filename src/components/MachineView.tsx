@@ -18,6 +18,7 @@ import {
   Zap,
   ZapOff,
   Edit,
+  Info,
 } from 'lucide-react';
 
 const MachineView: React.FC = () => {
@@ -36,7 +37,39 @@ const MachineView: React.FC = () => {
   });
   const [warnings, setWarnings] = useState<string[]>([]);
   const [currentLocalTime, setCurrentLocalTime] = useState(new Date());
+  // Tooltip state
+  const [tooltip, setTooltip] = useState<{
+    content: string;
+    x: number;
+    y: number;
+    visible: boolean;
+  } | null>(null);
 
+  // Handle mouse enter for tooltip
+  const handleMouseEnter = (content: string) => (e: React.MouseEvent) => {
+    setTooltip({
+      content,
+      x: e.clientX,
+      y: e.clientY,
+      visible: true
+    });
+  };
+
+  // Handle mouse leave for tooltip
+  const handleMouseLeave = () => {
+    setTooltip(null);
+  };
+
+  // Update tooltip position on mouse move
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (tooltip) {
+      setTooltip({
+        ...tooltip,
+        x: e.clientX,
+        y: e.clientY
+      });
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -300,6 +333,23 @@ const MachineView: React.FC = () => {
         theme="dark"
       />
       
+      {/* Custom Tooltip */}
+      {tooltip && (
+        <div 
+          className={`fixed bg-gray-800 text-white text-sm px-3 py-2 rounded-md shadow-lg z-50 border border-gray-700 transition-opacity ${
+            tooltip.visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+          style={{
+            left: tooltip.x + 10,
+            top: tooltip.y + 10,
+            transform: 'translate(0, -50%)',
+            maxWidth: '300px'
+          }}
+        >
+          {tooltip.content}
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -383,34 +433,66 @@ const MachineView: React.FC = () => {
 
       {/* Key Metrics - Compact Layout */}
       <div className="grid grid-cols-4 gap-2">
-        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+        <div 
+          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          onMouseEnter={handleMouseEnter('Total units produced in the selected time period')}
+          onMouseLeave={handleMouseLeave}
+          onMouseMove={handleMouseMove}
+        >
           <TrendingUp className="h-6 w-6 text-green-400 mr-3" />
           <div>
-            <p className="text-xs text-gray-400">Units</p>
+            <p className="text-xs text-gray-400 flex items-center">
+              Units
+              <Info className="h-3 w-3 ml-1 text-gray-500" />
+            </p>
             <p className="text-lg font-semibold text-white">{stats.totalUnitsProduced}</p>
           </div>
         </div>
 
-        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+        <div 
+          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          onMouseEnter={handleMouseEnter('Overall Equipment Effectiveness (Availability × Performance × Quality)')}
+          onMouseLeave={handleMouseLeave}
+          onMouseMove={handleMouseMove}
+        >
           <Gauge className="h-6 w-6 text-yellow-400 mr-3" />
           <div>
-            <p className="text-xs text-gray-400">OEE</p>
+            <p className="text-xs text-gray-400 flex items-center">
+              OEE
+              <Info className="h-3 w-3 ml-1 text-gray-500" />
+            </p>
             <p className="text-lg font-semibold text-yellow-400">{stats.oee}%</p>
           </div>
         </div>
 
-        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+        <div 
+          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          onMouseEnter={handleMouseEnter('Mean Time Between Failures (average time between breakdowns)')}
+          onMouseLeave={handleMouseLeave}
+          onMouseMove={handleMouseMove}
+        >
           <Clock className="h-6 w-6 text-blue-400 mr-3" />
           <div>
-            <p className="text-xs text-gray-400">MTBF</p>
+            <p className="text-xs text-gray-400 flex items-center">
+              MTBF
+              <Info className="h-3 w-3 ml-1 text-gray-500" />
+            </p>
             <p className="text-lg font-semibold text-blue-400">{stats.mtbf}m</p>
           </div>
         </div>
 
-        <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center">
+        <div 
+          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          onMouseEnter={handleMouseEnter('Mean Time To Repair (average time to repair a breakdown)')}
+          onMouseLeave={handleMouseLeave}
+          onMouseMove={handleMouseMove}
+        >
           <Activity className="h-6 w-6 text-purple-400 mr-3" />
           <div>
-            <p className="text-xs text-gray-400">MTTR</p>
+            <p className="text-xs text-gray-400 flex items-center">
+              MTTR
+              <Info className="h-3 w-3 ml-1 text-gray-500" />
+            </p>
             <p className="text-lg font-semibold text-purple-400">{stats.mttr}m</p>
           </div>
         </div>
@@ -445,8 +527,16 @@ const MachineView: React.FC = () => {
         <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">Performance Metrics</h3>
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Availability</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Percentage of time the machine was available for production')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Availability
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <div className="flex items-center space-x-2">
                 <div className="w-20 bg-gray-700 rounded-full h-2">
                   <div 
@@ -458,8 +548,16 @@ const MachineView: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Quality</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Percentage of units that meet quality standards')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Quality
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <div className="flex items-center space-x-2">
                 <div className="w-20 bg-gray-700 rounded-full h-2">
                   <div 
@@ -471,8 +569,16 @@ const MachineView: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Performance</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Actual production rate compared to the maximum possible rate')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Performance
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <div className="flex items-center space-x-2">
                 <div className="w-20 bg-gray-700 rounded-full h-2">
                   <div 
@@ -489,18 +595,42 @@ const MachineView: React.FC = () => {
         <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">Quality Metrics</h3>
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Good Units</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Units that passed quality inspection')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Good Units
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <span className="text-green-400 font-medium">
                 {stats.totalUnitsProduced - stats.totalDefectiveUnits}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Defective Units</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Units that failed quality inspection')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Defective Units
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <span className="text-red-400 font-medium">{stats.totalDefectiveUnits}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Defect Rate</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Percentage of units that were defective')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Defect Rate
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <span className="text-yellow-400 font-medium">
                 {stats.totalUnitsProduced > 0 
                   ? ((stats.totalDefectiveUnits / stats.totalUnitsProduced) * 100).toFixed(1)
@@ -514,8 +644,16 @@ const MachineView: React.FC = () => {
         <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">Reliability</h3>
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Current Status</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Current operational status of the machine')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Current Status
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <span className={`font-medium capitalize ${
                 machine.status === 'running' ? 'text-green-400' :
                 machine.status === 'inactive' ? 'text-red-400' :
@@ -525,16 +663,40 @@ const MachineView: React.FC = () => {
                 {machine.status}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">MTBF</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Mean Time Between Failures (average time between breakdowns)')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                MTBF
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <span className="text-blue-400 font-medium">{stats.mtbf} minutes</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">MTTR</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Mean Time To Repair (average time to repair a breakdown)')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                MTTR
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <span className="text-purple-400 font-medium">{stats.mttr} minutes</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Running Time</span>
+            <div 
+              className="flex justify-between items-center relative"
+              onMouseEnter={handleMouseEnter('Total time the machine was running in the selected period')}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+            >
+              <span className="text-gray-400 flex items-center">
+                Running Time
+                <Info className="h-3 w-3 ml-1 text-gray-500" />
+              </span>
               <span className="text-green-400 font-medium">
                 {Math.round((stats.totalRunningMinutes || 0) / 60 * 10) / 10}h
               </span>
