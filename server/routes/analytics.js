@@ -458,7 +458,6 @@ router.post('/production-assignment', auth, async (req, res) => {
           stoppageMinutes: 0,
           stoppages: [],
         };
-        productionRecord.hourlyData.push(hourData);
       }
 
       // Update or remove assignments
@@ -482,9 +481,9 @@ router.post('/production-assignment', auth, async (req, res) => {
       if (targetHour === hour && defectiveUnits !== undefined) {
         hourData.defectiveUnits = defectiveUnits;
       }
+      
+      productionRecord.hourlyData.push(hourData);
     }
-
-    productionRecord.markModified('hourlyData');
 
     // Update total defective units
     productionRecord.defectiveUnits = productionRecord.hourlyData.reduce(

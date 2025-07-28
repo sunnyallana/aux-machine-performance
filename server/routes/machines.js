@@ -58,7 +58,9 @@ router.get('/', auth, adminAuth, async (req, res) => {
 // Create machine (Admin only)
 router.post('/', auth, adminAuth, async (req, res) => {
   try {
-    const machine = new Machine(req.body);
+    const machine = new Machine({...req.body,
+      status: req.body.status || 'inactive'
+    });
     await machine.save();
     res.status(201).json(machine);
   } catch (error) {

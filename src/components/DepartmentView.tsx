@@ -32,11 +32,9 @@ const DepartmentView: React.FC = () => {
   const [newMachine, setNewMachine] = useState<{
     name: string;
     description: string;
-    status: Machine['status'];
   }>({
     name: '',
     description: '',
-    status: 'inactive'
   });
   const [editLayoutMode, setEditLayoutMode] = useState(false);
   const [positions, setPositions] = useState<{[key: string]: {x: number; y: number}}>({});
@@ -240,7 +238,6 @@ const DepartmentView: React.FC = () => {
       setNewMachine({
         name: '',
         description: '',
-        status: 'inactive'
       });
       toast.success('Machine added successfully');
     } catch (err) {
@@ -612,22 +609,6 @@ const DepartmentView: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Initial Status
-                </label>
-                <select
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newMachine.status}
-                  onChange={(e) => setNewMachine({...newMachine, status: e.target.value as any})}
-                >
-                  <option value="running">Running</option>
-                  <option value="stopped">Stopped</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="error">Error</option>
-                </select>
-              </div>
-              
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   onClick={() => setIsAddingMachine(false)}
