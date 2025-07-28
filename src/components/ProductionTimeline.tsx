@@ -77,6 +77,18 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   // Check for pending stoppages
   const pendingStoppage = hour.stoppages.find(s => s.reason === 'unclassified' || (s as any).isPending);
 
+  useEffect(() => {
+    if (pendingStoppage) {
+      setActiveTab('stoppage');
+      setStoppageForm({
+        reason: '',
+        description: '',
+        duration: pendingStoppage.duration || 30,
+        sapNotificationNumber: ''
+      });
+    }
+  }, [pendingStoppage]);
+
   // Detect shift when hour changes
   useEffect(() => {
     if (shifts.length > 0 && hour) {

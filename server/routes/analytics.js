@@ -444,11 +444,11 @@ router.post('/production-assignment', auth, async (req, res) => {
       }
     }
 
-    // Update each hour in the range
     for (const targetHour of hoursToUpdate) {
-      // Find or create hourly data
       let hourData = productionRecord.hourlyData.find(h => h.hour === targetHour);
+      
       if (!hourData) {
+        // Create new entry
         hourData = {
           hour: targetHour,
           unitsProduced: 0,
@@ -456,40 +456,58 @@ router.post('/production-assignment', auth, async (req, res) => {
           status: 'inactive',
           runningMinutes: 0,
           stoppageMinutes: 0,
-          stoppages: [],
+          stoppages: []
         };
-      }
-
-      // Update or remove assignments
-      if (validOperatorId !== undefined) {
-        hourData.operatorId = validOperatorId;
+        
+        // Set assignments for new entry
+        if (validOperatorId !== undefined) {
+          hourData.operatorId = validOperatorId;
+        }
+        
+        if (validMoldId !== undefined) {
+          hourData.moldId = validMoldId;
+        }
+        
+        if (targetHour === hour && defectiveUnits !== undefined) {
+          hourData.defectiveUnits = defectiveUnits;
+        }
+        
+        productionRecord.hourlyData.push(hourData);
       } else {
-        // Unassign operator by removing the field
-        hourData.operatorId = undefined;
-        delete hourData.operatorId;
+        // Update existing entry
+        if (validOperatorId !== undefined) {
+          hourData.operatorId = validOperatorId;
+        } else {
+          // Unassign operator by removing the field
+          hourData.operatorId = undefined;
+          delete hourData.operatorId;
+        }
+        
+        if (validMoldId !== undefined) {
+          hourData.moldId = validMoldId;
+        } else {
+          // Unassign mold by removing the field
+          hourData.moldId = undefined;
+          delete hourData.moldId;
+        }
+        
+        if (targetHour === hour && defectiveUnits !== undefined) {
+          hourData.defectiveUnits = defectiveUnits;
+        }
+        
       }
-      
-      if (validMoldId !== undefined) {
-        hourData.moldId = validMoldId;
-      } else {
-        // Unassign mold by removing the field
-        hourData.moldId = undefined;
-        delete hourData.moldId;
-      }
-      
-      // Only update defective units for the original hour
-      if (targetHour === hour && defectiveUnits !== undefined) {
-        hourData.defectiveUnits = defectiveUnits;
-      }
-      
-      productionRecord.hourlyData.push(hourData);
     }
 
-    // Update total defective units
-    productionRecord.defectiveUnits = productionRecord.hourlyData.reduce(
-      (sum, h) => sum + (h.defectiveUnits || 0), 0
+    // Mark document as modified
+    productionRecord.markModified('hourlyData');
+
+    // Update total units produced
+    productionRecord.unitsProduced = productionRecord.hourlyData.reduce(
+      (sum, h) => sum + (h.unitsProduced || 0), 
+      0
     );
 
+    // Save the production record
     await productionRecord.save();
 
     // Emit socket event
