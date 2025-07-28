@@ -5,6 +5,7 @@ import apiService from '../services/api';
 import socketService from '../services/socket';
 import ProductionTimeline from './ProductionTimeline';
 import { ToastContainer, toast } from 'react-toastify';
+import { format, isToday } from 'date-fns';
 import 'react-toastify/dist/ReactToastify.css';
 
 import {
@@ -33,19 +34,58 @@ const MachineView: React.FC = () => {
     name: '',
     description: ''
   });
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [currentLocalTime, setCurrentLocalTime] = useState(new Date());
+
 
   useEffect(() => {
     if (id) {
       fetchMachineData();
       setupSocketListeners();
     }
-
     return () => {
       if (id) {
         socketService.leaveMachine(id);
       }
     };
   }, [id, selectedPeriod]);
+
+  // useEffect for time updates
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentLocalTime(new Date());
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(timer);
+  }, []);
+
+  // useEffect to check assignments
+  useEffect(() => {
+    if (!timeline.length) return;
+    
+    const newWarnings: string[] = [];
+    const currentLocalHour = currentLocalTime.getHours();
+    const today = format(currentLocalTime, 'yyyy-MM-dd');
+    
+    timeline.forEach(day => {
+      // Only check today's data
+      if (day.date !== today) return;
+      
+      day.hours.forEach(hour => {
+        // Only check current and past hours
+        if (hour.hour > currentLocalHour) return;
+        
+        if (!hour.operator) {
+          newWarnings.push(`Operator not assigned for ${hour.hour}:00`);
+        }
+        if (!hour.mold) {
+          newWarnings.push(`Mold not assigned for ${hour.hour}:00`);
+        }
+      });
+    });
+    
+    setWarnings(newWarnings);
+  }, [timeline, currentLocalTime]);
 
   const setupSocketListeners = () => {
     if (!id) return;
@@ -62,7 +102,27 @@ const MachineView: React.FC = () => {
 
     const handleAssignmentUpdated = (update: any) => {
       if (update.machineId === id) {
+        // Optimistically update timeline
+        setTimeline(prev => prev.map(day => {
+          if (day.date !== update.date) return day;
+          return {
+            ...day,
+            hours: day.hours.map(hour => {
+              if (!update.hours.includes(hour.hour)) return hour;
+              return {
+                ...hour,
+                operator: update.operatorId ?? undefined,
+                mold: update.moldId ?? undefined
+              };
+            })
+          };
+        }));
+        
         fetchStats();
+        // Remove warnings for updated hours
+        setWarnings(prev => prev.filter(w => 
+          !update.hours.includes(parseInt(w.split(' ')[4]))
+        ));
       }
     };
 
@@ -305,6 +365,21 @@ const MachineView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Mold, Operator Assignment Warning */}
+      {warnings.length > 0 && (
+      <div className="bg-yellow-900/30 border border-yellow-500 rounded-lg p-4 mb-6">
+        <div className="flex items-center space-x-2 mb-2">
+          <AlertTriangle className="h-5 w-5 text-yellow-400" />
+          <h3 className="text-yellow-400 font-medium">Assignment Warnings</h3>
+        </div>
+        <ul className="list-disc pl-5 text-yellow-300">
+          {warnings.map((warning, index) => (
+            <li key={index}>{warning}</li>
+          ))}
+        </ul>
+      </div>
+      )}
 
       {/* Key Metrics - Compact Layout */}
       <div className="grid grid-cols-4 gap-2">
