@@ -42,9 +42,14 @@ router.get('/', auth, async (req, res) => {
     if (departmentId) query.departmentId = departmentId;
     if (machineId) query.machineId = machineId;
 
-    const reports = await Report.find(query)
-      .populate('departmentId machineId generatedBy')
-      .sort({ createdAt: -1 });
+   const reports = await Report.find(query)
+    .populate({
+      path: 'generatedBy',
+      select: 'username',
+      options: { retainNullValues: true } // Keep null if user deleted
+    })
+    .populate('departmentId machineId')
+    .sort({ createdAt: -1 });
 
     res.json(reports);
   } catch (error) {

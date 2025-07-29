@@ -138,8 +138,37 @@ class ApiService {
   }
 
   // Users
-  async getUsers() {
-    return this.request('/users');
+
+   async getUsers(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    role?: string;
+    department?: string;
+    isActive?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    let endpoint = '/users';
+    
+    if (params) {
+      const searchParams = new URLSearchParams();
+      
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+      if (params.search) searchParams.append('search', params.search);
+      if (params.role) searchParams.append('role', params.role);
+      if (params.department) searchParams.append('department', params.department);
+      if (params.isActive) searchParams.append('isActive', params.isActive);
+      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
+      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
+      
+      if (searchParams.toString()) {
+        endpoint += `?${searchParams.toString()}`;
+      }
+    }
+    
+    return this.request(endpoint);
   }
 
   async createUser(user: any) {

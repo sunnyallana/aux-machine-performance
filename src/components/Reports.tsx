@@ -477,7 +477,7 @@ const Reports: React.FC = () => {
                       {new Date(report.createdAt).toLocaleDateString()}
                     </div>
                     <div className="text-xs text-gray-400">
-                      by {report.generatedBy.username || 'System'}
+                      by {report.generatedBy.username ? report.generatedBy.username : 'System'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

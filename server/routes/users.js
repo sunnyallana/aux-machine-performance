@@ -4,30 +4,92 @@ const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-
-// Get current operator (for self-assignment)
-router.get('/me/operator', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id)
-      .select('-password -isActive -email');
-      
-    if (!user || user.role !== 'operator') {
-      return res.status(403).json({ message: 'Operator access required' });
-    }
-    
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// Get all users
+// Get all users with pagination and search (Admin only)
 router.get('/', auth, adminAuth, async (req, res) => {
   try {
-    const users = await User.find({})
-      .populate('departmentId', 'name _id')
-      .select('-password');
-    res.json(users);
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      role = '',
+      department = '',
+      isActive = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Convert page and limit to numbers
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build search query
+    let query = {};
+
+    // Text search across username, email
+    if (search.trim()) {
+      query.$or = [
+        { username: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by role
+    if (role.trim()) {
+      query.role = role;
+    }
+
+    // Filter by department (for operators)
+    if (department.trim()) {
+      query.departmentId = department;
+    }
+
+    // Filter by active status
+    if (isActive !== '') {
+      query.isActive = isActive === 'true';
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute queries
+    const [users, totalUsers] = await Promise.all([
+      User.find(query)
+        .populate('departmentId', 'name _id')
+        .select('-password')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limitNum),
+      User.countDocuments(query)
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalUsers / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
+
+    res.json({
+      users,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalUsers,
+        limit: limitNum,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? pageNum + 1 : null,
+        prevPage: hasPrevPage ? pageNum - 1 : null
+      },
+      filters: {
+        search,
+        role,
+        department,
+        isActive,
+        sortBy,
+        sortOrder
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -52,7 +114,7 @@ router.post('/', auth, adminAuth, async (req, res) => {
     const user = new User(userData);
     await user.save();
     
-    // Return user without password 
+    // Return user without password
     const userWithoutPassword = user.toObject();
     delete userWithoutPassword.password;
     
@@ -141,11 +203,16 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
-
 // Delete user (Admin only)
 router.delete('/:id', auth, adminAuth, async (req, res) => {
   try {
+    
+    if (req.params.id === req.user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
+    }
+    
     const user = await User.findByIdAndDelete(req.params.id);
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }

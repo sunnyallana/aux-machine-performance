@@ -66,8 +66,8 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
   });
   const [assignmentForm, setAssignmentForm] = useState({
     operatorId: currentUser?.role === 'operator' 
-    ? (currentUser._id || currentUser.id || '')
-    : (hour.operator?._id || hour.operator?.id || ''),
+    ? (currentUser.id || '')
+    : (hour.operator?.id || ''),
   moldId: hour.mold?._id || '',
   defectiveUnits: hour.defectiveUnits || 0
   });
@@ -454,7 +454,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
                 >
                   <option value="">No operator assigned</option>
                   {availableOperators.map((operator) => (
-                    <option key={operator._id || operator.id} value={operator._id || operator.id}>
+                    <option key={operator.id} value={operator.id}>
                       {operator.username}
                     </option>
                   ))}
@@ -845,6 +845,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       }
     };
 
+
     const handleProductionAssignmentUpdated = (update: any) => {
       if (update.machineId === machineId) {
         setData(prevData => {
@@ -876,7 +877,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
               if (hourIndex >= 0) {
                 if (update.operatorId !== null) {
                   const operator = availableOperators.find(op => 
-                    op._id === update.operatorId || op.id === update.operatorId
+                    op.id === update.operatorId
                   );
                   if (operator) {
                     newData[dayIndex].hours[hourIndex].operator = operator;
@@ -904,6 +905,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           return newData;
         });
       }
+      fetchData();
     };
 
     const handleStoppageUpdated = (update: any) => {
@@ -960,14 +962,18 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
     };
   }, [machineId, availableOperators, availableMolds]);
 
-  // Fetch operators and molds
-  useEffect(() => {
-    const fetchData = async () => {
+     const fetchData = async () => {
       try {
         let operators: User[] = [];
         if (currentUser?.role === 'admin') {
-          operators = await apiService.getUsers();
-        } else {
+          const response = await apiService.getUsers({
+            role: 'operator',
+            isActive: 'true',
+            limit: 1000
+          });
+          operators = response.users;
+        }
+        else {
           // Fetch only current operator
           const operator = await apiService.getCurrentOperator();
           operators = [operator];
@@ -982,8 +988,13 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
         console.error('Failed to fetch operators and molds:', error);
       }
     };
+
+  // Fetch operators and molds
+  useEffect(() => {
     fetchData();
   }, [currentUser]);
+
+
 
 
   // Fetch shifts

@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useContext } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ThemeContext } from '../App';
 import apiService from '../services/api';
 import {
   Users as UsersIcon,
@@ -15,18 +13,56 @@ import {
   Loader,
   Building2,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronLeft,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+interface PaginationData {
+  currentPage: number;
+  totalPages: number;
+  totalUsers: number;
+  limit: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+interface UsersResponse {
+  users: any[];
+  pagination: PaginationData;
+  filters: {
+    search: string;
+    role: string;
+    department: string;
+    isActive: string;
+    sortBy: string;
+    sortOrder: string;
+  };
+}
+
 const Users: React.FC = () => {
   const { isAdmin } = useAuth();
-  const { isDarkMode } = useContext(ThemeContext);
-  const [users, setUsers] = useState<any[]>([]);
+  const [usersData, setUsersData] = useState<UsersResponse | null>(null);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Pagination and filtering states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Modal states
   const [isCreating, setIsCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [formData, setFormData] = useState({
@@ -42,25 +78,93 @@ const Users: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Debounced search
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  const fetchData = async () => {
+  const fetchUsers = useCallback(async (page = 1, search = '', role = '', department = '', isActive = '') => {
     try {
       setLoading(true);
-      const [usersData, departmentsData] = await Promise.all([
-        apiService.getUsers(),
-        apiService.getAllDepartments()
-      ]);
-      setUsers(usersData);
-      setDepartments(departmentsData);
+      
+      const params = {
+        page,
+        limit: pageSize,
+        sortBy,
+        sortOrder,
+        ...(search && { search }),
+        ...(role && { role }),
+        ...(department && { department }),
+        ...(isActive !== '' && { isActive })
+      };
+
+      const data: UsersResponse = await apiService.getUsers(params);
+      setUsersData(data);
+      setCurrentPage(data.pagination.currentPage);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch data';
+      const message = err instanceof Error ? err.message : 'Failed to fetch users';
       toast.error(message);
+      console.error('Fetch users error:', err);
     } finally {
       setLoading(false);
     }
+  }, [pageSize, sortBy, sortOrder]);
+
+  const fetchDepartments = async () => {
+    try {
+      const departmentsData = await apiService.getAllDepartments();
+      setDepartments(departmentsData);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch departments';
+      toast.error(message);
+    }
+  };
+
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
+
+  useEffect(() => {
+    fetchUsers(1, searchTerm, roleFilter, departmentFilter, statusFilter);
+  }, [fetchUsers, roleFilter, departmentFilter, statusFilter, sortBy, sortOrder]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      if (searchTerm !== (usersData?.filters.search || '')) {
+        fetchUsers(1, searchTerm, roleFilter, departmentFilter, statusFilter);
+      }
+    }, 500);
+
+    setSearchTimeout(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [searchTerm]);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && usersData && page <= usersData.pagination.totalPages) {
+      fetchUsers(page, searchTerm, roleFilter, departmentFilter, statusFilter);
+    }
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+    fetchUsers(1, searchTerm, roleFilter, departmentFilter, statusFilter);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setRoleFilter('');
+    setDepartmentFilter('');
+    setStatusFilter('');
+    setSortBy('createdAt');
+    setSortOrder('desc');
+    setCurrentPage(1);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -105,8 +209,8 @@ const Users: React.FC = () => {
         userData.departmentId = undefined;
       }
 
-      const newUser = await apiService.createUser(userData);
-      setUsers([...users, newUser]);
+      await apiService.createUser(userData);
+      
       setFormData({
         username: '',
         email: '',
@@ -117,6 +221,9 @@ const Users: React.FC = () => {
       });
       setIsCreating(false);
       toast.success("User created successfully");
+      
+      // Refresh the current page
+      fetchUsers(currentPage, searchTerm, roleFilter, departmentFilter, statusFilter);
     } catch (err) {
       let message = 'Failed to create user';
       
@@ -139,7 +246,7 @@ const Users: React.FC = () => {
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
-    
+
     try {
       const updateData: any = {
         username: editingUser.username,
@@ -159,13 +266,12 @@ const Users: React.FC = () => {
         updateData.departmentId = undefined;
       }
 
-      const updatedUser = await apiService.updateUser(editingUser.id, updateData);
-      
-      setUsers(users.map(user => 
-        user.id === editingUser.id ? updatedUser : user
-      ));
+      await apiService.updateUser(editingUser.id, updateData);
       setEditingUser(null);
       toast.success("User updated successfully");
+      
+      // Refresh the current page
+      fetchUsers(currentPage, searchTerm, roleFilter, departmentFilter, statusFilter);
     } catch (err) {
       let message = 'Failed to update user';
       
@@ -185,17 +291,14 @@ const Users: React.FC = () => {
     }
   };
 
- 
   const handleToggleStatus = async (id: string, isActive: boolean) => {
     try {
       setStatusTogglingId(id);
-      const updatedUser = await apiService.updateUser(id, { 
-        isActive: !isActive 
-      });
-      setUsers(users.map(user => 
-        user.id === id ? updatedUser : user
-      ));
+      await apiService.updateUser(id, { isActive: !isActive });
       toast.success(`User ${!isActive ? 'activated' : 'deactivated'} successfully`);
+      
+      // Refresh the current page
+      fetchUsers(currentPage, searchTerm, roleFilter, departmentFilter, statusFilter);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update user status';
       toast.error(message);
@@ -209,8 +312,14 @@ const Users: React.FC = () => {
       try {
         setDeletingId(id);
         await apiService.deleteUser(id);
-        setUsers(users.filter(user => user.id !== id));
         toast.success("User deleted successfully");
+        
+        // If we're on the last page and it becomes empty, go to previous page
+        if (usersData && usersData.users.length === 1 && currentPage > 1) {
+          fetchUsers(currentPage - 1, searchTerm, roleFilter, departmentFilter, statusFilter);
+        } else {
+          fetchUsers(currentPage, searchTerm, roleFilter, departmentFilter, statusFilter);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to delete user';
         toast.error(message);
@@ -219,11 +328,6 @@ const Users: React.FC = () => {
       }
     }
   };
-
-  const filteredUsers = users.filter(user => 
-    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const getDepartmentName = (deptData: any) => {
     if (!deptData) return 'N/A';
@@ -236,7 +340,81 @@ const Users: React.FC = () => {
     return department ? department.name : 'N/A';
   };
 
-  if (loading) {
+  const Pagination = ({ pagination }: { pagination: PaginationData }) => {
+    if (pagination.totalPages <= 1) return null;
+
+    const getPageNumbers = () => {
+      const pages = [];
+      const maxVisible = 5;
+      let start = Math.max(1, pagination.currentPage - Math.floor(maxVisible / 2));
+      let end = Math.min(pagination.totalPages, start + maxVisible - 1);
+      
+      if (end - start + 1 < maxVisible) {
+        start = Math.max(1, end - maxVisible + 1);
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      
+      return pages;
+    };
+
+    return (
+      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-t border-gray-700">
+        <div className="flex items-center text-sm text-gray-400">
+          Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+          {Math.min(pagination.currentPage * pagination.limit, pagination.totalUsers)} of{' '}
+          {pagination.totalUsers} results
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <select
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+            className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+          >
+            <option value={5}>5 per page</option>
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+            <option value={50}>50 per page</option>
+          </select>
+          
+          <button
+            onClick={() => handlePageChange(pagination.currentPage - 1)}
+            disabled={!pagination.hasPrevPage}
+            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          
+          {getPageNumbers().map(page => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-3 py-1 rounded text-sm ${
+                page === pagination.currentPage
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          
+          <button
+            onClick={() => handlePageChange(pagination.currentPage + 1)}
+            disabled={!pagination.hasNextPage}
+            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && !usersData) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -244,8 +422,11 @@ const Users: React.FC = () => {
     );
   }
 
+  const users = usersData?.users || [];
+  const pagination = usersData?.pagination;
+
   return (
-    <div className={`space-y-6 ${isDarkMode ? '' : 'min-h-screen bg-gray-50'}`}>
+    <div className="space-y-6">
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -256,16 +437,16 @@ const Users: React.FC = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme={isDarkMode ? "dark" : "light"}
+        theme="dark"
       />
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <UsersIcon className="h-8 w-8 text-blue-400" />
           <div>
-            <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>User Management</h1>
-            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Manage system users and their permissions</p>
+            <h1 className="text-2xl font-bold text-white">User Management</h1>
+            <p className="text-gray-400">Manage system users and their permissions</p>
           </div>
         </div>
         
@@ -277,15 +458,28 @@ const Users: React.FC = () => {
             <input
               type="text"
               placeholder="Search users..."
-              className={`pl-10 pr-4 py-2 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                isDarkMode 
-                  ? 'bg-gray-800 border-gray-700 text-white' 
-                  : 'bg-white border-gray-300 text-gray-900'
-              }`}
+              className="pl-10 pr-4 py-2 w-full bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {loading && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <Loader className="h-4 w-4 animate-spin text-gray-400" />
+              </div>
+            )}
           </div>
+          
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center space-x-2 px-4 py-2 border rounded-md transition-colors ${
+              showFilters 
+                ? 'bg-blue-600 border-blue-600 text-white' 
+                : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+            }`}
+          >
+            <Filter className="h-4 w-4" />
+            <span>Filters</span>
+          </button>
           
           {isAdmin && (
             <button 
@@ -299,69 +493,135 @@ const Users: React.FC = () => {
         </div>
       </div>
 
+      {/* Filters Panel */}
+      {showFilters && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="operator">Operator</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Department</label>
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Departments</option>
+                {departments.map(dept => (
+                  <option key={dept._id} value={dept._id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Sort By</label>
+              <div className="flex space-x-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="createdAt">Created Date</option>
+                  <option value="username">Username</option>
+                  <option value="email">Email</option>
+                  <option value="role">Role</option>
+                </select>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="desc">↓</option>
+                  <option value="asc">↑</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className={`p-4 rounded-lg border ${
-          isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200 shadow-sm'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Users</p>
-              <p className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{users.length}</p>
+      {pagination && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Total Users</p>
+                <p className="text-xl font-semibold text-white">{pagination.totalUsers}</p>
+              </div>
+              <UserIcon className="h-8 w-8 text-blue-400" />
             </div>
-            <UserIcon className="h-8 w-8 text-blue-400" />
           </div>
-        </div>
 
-        <div className={`p-4 rounded-lg border ${
-          isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200 shadow-sm'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Active Users</p>
-              <p className="text-xl font-semibold text-green-400">
-                {users.filter(u => u.isActive).length}
-              </p>
+          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Current Page</p>
+                <p className="text-xl font-semibold text-green-400">
+                  {pagination.currentPage} of {pagination.totalPages}
+                </p>
+              </div>
+              <Power className="h-8 w-8 text-green-400" />
             </div>
-            <Power className="h-8 w-8 text-green-400" />
           </div>
-        </div>
 
-        <div className={`p-4 rounded-lg border ${
-          isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200 shadow-sm'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Admins</p>
-              <p className="text-xl font-semibold text-yellow-400">
-                {users.filter(u => u.role === 'admin').length}
-              </p>
+          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Showing</p>
+                <p className="text-xl font-semibold text-yellow-400">
+                  {users.length} users
+                </p>
+              </div>
+              <UsersIcon className="h-8 w-8 text-yellow-400" />
             </div>
-            <UserIcon className="h-8 w-8 text-yellow-400" />
           </div>
         </div>
-      </div>
+      )}
 
       {/* Create User Modal */}
       {isCreating && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg border w-full max-w-md ${
-            isDarkMode 
-              ? 'bg-gray-800 border-gray-700' 
-              : 'bg-white border-gray-200'
-          }`}>
-            <div className={`p-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
+            <div className="p-6 border-b border-gray-700">
               <div className="flex items-center justify-between">
-                <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Create New User</h3>
+                <h3 className="text-lg font-semibold text-white">Create New User</h3>
                 <button 
                   onClick={() => setIsCreating(false)}
-                  className={isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}
+                  className="text-gray-400 hover:text-white"
                 >
                   &times;
                 </button>
@@ -370,7 +630,7 @@ const Users: React.FC = () => {
             
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
               <div>
-                <label htmlFor="username" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
                   Username *
                 </label>
                 <input
@@ -378,18 +638,14 @@ const Users: React.FC = () => {
                   id="username"
                   name="username"
                   required
-                  className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.username}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="email" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
                   Email *
                 </label>
                 <input
@@ -397,18 +653,14 @@ const Users: React.FC = () => {
                   id="email"
                   name="email"
                   required
-                  className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.email}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="password" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
                   Password *
                 </label>
                 <div className="relative">
@@ -417,11 +669,7 @@ const Users: React.FC = () => {
                     id="password"
                     name="password"
                     required
-                    className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={formData.password}
                     onChange={handleInputChange}
                   />
@@ -440,18 +688,14 @@ const Users: React.FC = () => {
               </div>
               
               <div>
-                <label htmlFor="role" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="role" className="block text-sm font-medium text-gray-300 mb-1">
                   Role *
                 </label>
                 <select
                   id="role"
                   name="role"
                   required
-                  className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.role}
                   onChange={handleInputChange}
                 >
@@ -462,18 +706,14 @@ const Users: React.FC = () => {
               
               {formData.role === 'operator' && (
                 <div>
-                  <label htmlFor="departmentId" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label htmlFor="departmentId" className="block text-sm font-medium text-gray-300 mb-1">
                     Department *
                   </label>
                   <select
                     id="departmentId"
                     name="departmentId"
                     required
-                    className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={formData.departmentId}
                     onChange={handleInputChange}
                   >
@@ -489,11 +729,7 @@ const Users: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCreating(false)}
-                  className={`px-4 py-2 border rounded-md ${
-                    isDarkMode 
-                      ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
                 >
                   Cancel
                 </button>
@@ -511,18 +747,14 @@ const Users: React.FC = () => {
 
       {/* Edit User Modal */}
       {editingUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg border w-full max-w-md ${
-            isDarkMode 
-              ? 'bg-gray-800 border-gray-700' 
-              : 'bg-white border-gray-200'
-          }`}>
-            <div className={`p-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
+            <div className="p-6 border-b border-gray-700">
               <div className="flex items-center justify-between">
-                <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Edit User</h3>
+                <h3 className="text-lg font-semibold text-white">Edit User</h3>
                 <button 
                   onClick={() => setEditingUser(null)}
-                  className={isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}
+                  className="text-gray-400 hover:text-white"
                 >
                   &times;
                 </button>
@@ -531,7 +763,7 @@ const Users: React.FC = () => {
             
             <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
               <div>
-                <label htmlFor="edit-username" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="edit-username" className="block text-sm font-medium text-gray-300 mb-1">
                   Username *
                 </label>
                 <input
@@ -539,18 +771,14 @@ const Users: React.FC = () => {
                   id="edit-username"
                   name="username"
                   required
-                  className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={editingUser.username}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="edit-email" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="edit-email" className="block text-sm font-medium text-gray-300 mb-1">
                   Email *
                 </label>
                 <input
@@ -558,19 +786,14 @@ const Users: React.FC = () => {
                   id="edit-email"
                   name="email"
                   required
-                  className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={editingUser.email}
                   onChange={handleInputChange}
                 />
               </div>
               
-              {/* Password field for editing */}
               <div>
-                <label htmlFor="edit-password" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="edit-password" className="block text-sm font-medium text-gray-300 mb-1">
                   New Password
                 </label>
                 <div className="relative">
@@ -578,11 +801,7 @@ const Users: React.FC = () => {
                     type={showEditPassword ? "text" : "password"}
                     id="edit-password"
                     name="password"
-                    className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={editingUser.password || ''}
                     onChange={handleInputChange}
                     placeholder="Leave blank to keep current password"
@@ -599,24 +818,20 @@ const Users: React.FC = () => {
                     )}
                   </button>
                 </div>
-                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                <p className="text-xs text-gray-500 mt-1">
                   Only enter a value if you want to change the password
                 </p>
               </div>
               
               <div>
-                <label htmlFor="edit-role" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label htmlFor="edit-role" className="block text-sm font-medium text-gray-300 mb-1">
                   Role *
                 </label>
                 <select
                   id="edit-role"
                   name="role"
                   required
-                  className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={editingUser.role}
                   onChange={handleInputChange}
                 >
@@ -627,18 +842,14 @@ const Users: React.FC = () => {
               
               {editingUser.role === 'operator' && (
                 <div>
-                  <label htmlFor="edit-departmentId" className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label htmlFor="edit-departmentId" className="block text-sm font-medium text-gray-300 mb-1">
                     Department *
                   </label>
                   <select
                     id="edit-departmentId"
                     name="departmentId"
                     required
-                    className={`w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={editingUser.departmentId || ''}
                     onChange={handleInputChange}
                   >
@@ -654,11 +865,7 @@ const Users: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className={`px-4 py-2 border rounded-md ${
-                    isDarkMode 
-                      ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
                 >
                   Cancel
                 </button>
@@ -675,49 +882,39 @@ const Users: React.FC = () => {
       )}
 
       {/* Users Table */}
-      <div className={`rounded-lg border overflow-hidden ${
-        isDarkMode 
-          ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200 shadow-sm'
-      }`}>
+      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className={`min-w-full divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-            <thead className={isDarkMode ? 'bg-gray-750' : 'bg-gray-50'}>
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead className="bg-gray-750">
               <tr>
-                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   User
                 </th>
-                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Role
                 </th>
-                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Department
                 </th>
-                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Status
                 </th>
-                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Created
                 </th>
                 {isAdmin && (
-                  <th scope="col" className={`px-6 py-3 text-right text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Actions
                   </th>
                 )}
               </tr>
             </thead>
-            <tbody className={`divide-y ${
-              isDarkMode 
-                ? 'bg-gray-800 divide-gray-700' 
-                : 'bg-white divide-gray-200'
-            }`}>
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
+              {users.length > 0 ? (
+                users.map((user) => (
                   <tr 
                     key={user.id} 
-                    className={`${!user.isActive ? 'opacity-70' : ''} ${
-                      isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'
-                    }`}
+                    className={`hover:bg-gray-750 ${!user.isActive ? 'opacity-70' : ''}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -727,19 +924,15 @@ const Users: React.FC = () => {
                           <UserIcon className="h-5 w-5 text-white" />
                         </div>
                         <div className="ml-4">
-                          <div className={`text-sm font-medium flex items-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          <div className="text-sm font-medium text-white flex items-center">
                             {user.username}
                             {!user.isActive && (
-                              <span className={`ml-2 text-xs px-2 py-0.5 rounded ${
-                                isDarkMode 
-                                  ? 'bg-gray-700 text-gray-300' 
-                                  : 'bg-gray-200 text-gray-600'
-                              }`}>
+                              <span className="ml-2 text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
                                 Inactive
                               </span>
                             )}
                           </div>
-                          <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          <div className="text-xs text-gray-400">
                             {user.email}
                           </div>
                         </div>
@@ -755,7 +948,7 @@ const Users: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-sm flex items-center ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                      <div className="text-sm text-gray-300 flex items-center">
                         {user.departmentId ? (
                           <>
                             <Building2 className="h-4 w-4 mr-1 text-blue-400" />
@@ -775,7 +968,7 @@ const Users: React.FC = () => {
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                     {isAdmin && (
@@ -786,19 +979,16 @@ const Users: React.FC = () => {
                               e.stopPropagation();
                               setEditingUser({
                                 ...user,
+                                _id: user.id,
                                 departmentId: user.departmentId 
                                   ? (typeof user.departmentId === 'object' 
                                       ? user.departmentId._id 
                                       : user.departmentId)
                                   : '',
-                                password: '' // Initialize password field
+                                password: ''
                               });
                             }}
-                            className={`p-1 rounded-md ${
-                              isDarkMode 
-                                ? 'text-blue-400 hover:text-blue-300 hover:bg-gray-700' 
-                                : 'text-blue-500 hover:text-blue-700 hover:bg-blue-50'
-                            }`}
+                            className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
                             title="Edit"
                           >
                             <Edit className="h-4 w-4" />
@@ -809,10 +999,10 @@ const Users: React.FC = () => {
                               handleToggleStatus(user.id, user.isActive);
                             }}
                             disabled={statusTogglingId === user.id}
-                            className={`p-1 rounded-md ${
+                            className={`p-1 rounded-md hover:bg-gray-700 ${
                               user.isActive 
-                                ? (isDarkMode ? 'text-yellow-400 hover:text-yellow-300 hover:bg-gray-700' : 'text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50')
-                                : (isDarkMode ? 'text-green-400 hover:text-green-300 hover:bg-gray-700' : 'text-green-500 hover:text-green-700 hover:bg-green-50')
+                                ? 'text-yellow-400 hover:text-yellow-300' 
+                                : 'text-green-400 hover:text-green-300'
                             } ${statusTogglingId === user.id ? 'opacity-50' : ''}`}
                             title={user.isActive ? 'Deactivate' : 'Activate'}
                           >
@@ -830,11 +1020,7 @@ const Users: React.FC = () => {
                               handleDeleteUser(user.id);
                             }}
                             disabled={deletingId === user.id}
-                            className={`p-1 rounded-md ${
-                              isDarkMode 
-                                ? 'text-red-400 hover:text-red-300 hover:bg-gray-700' 
-                                : 'text-red-500 hover:text-red-700 hover:bg-red-50'
-                            } ${
+                            className={`text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700 ${
                               deletingId === user.id ? 'opacity-50' : ''
                             }`}
                             title="Delete permanently"
@@ -851,17 +1037,17 @@ const Users: React.FC = () => {
                   </tr>
                 ))
               ) : (
-                <tr key="no-users">
+                <tr>
                   <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <UserIcon className={`h-12 w-12 mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-                      <h3 className={`text-lg font-medium mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>No users found</h3>
-                      <p className={`max-w-md ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                        {searchTerm 
-                          ? `No users match your search for "${searchTerm}"` 
+                      <UserIcon className="h-12 w-12 text-gray-600 mb-4" />
+                      <h3 className="text-lg font-medium text-gray-400 mb-2">No users found</h3>
+                      <p className="text-gray-500 max-w-md">
+                        {searchTerm || roleFilter || departmentFilter || statusFilter !== ''
+                          ? 'No users match your current filters' 
                           : 'Get started by creating your first user'}
                       </p>
-                      {isAdmin && !searchTerm && (
+                      {isAdmin && !searchTerm && !roleFilter && !departmentFilter && statusFilter === '' && (
                         <button 
                           onClick={() => setIsCreating(true)}
                           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -876,6 +1062,9 @@ const Users: React.FC = () => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {pagination && <Pagination pagination={pagination} />}
       </div>
     </div>
   );

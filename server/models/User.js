@@ -76,10 +76,10 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 userSchema.pre('remove', async function(next) {
-  // Set generatedBy to null when user is deleted
+  // Remove user reference from reports instead of setting to null
   await mongoose.model('Report').updateMany(
     { generatedBy: this._id },
-    { $set: { generatedBy: null } }
+    { $unset: { generatedBy: "" } }  // Remove the field entirely
   );
   next();
 });
