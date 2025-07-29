@@ -208,6 +208,8 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       toast.error('Failed to update assignment');
     }
 
+    
+
     socketService.emit('production-assignment-updated', {
       machineId,
       date,
@@ -664,7 +666,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   data: initialData, 
   machineId, 
   onAddStoppage, 
-  onUpdateProduction 
+  onUpdateProduction,
 }) => {
   const [data, setData] = useState(initialData);
   const [selectedHour, setSelectedHour] = useState<{ hour: ProductionHour; date: string } | null>(null);
@@ -677,6 +679,34 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   const [machineColor, setMachineColor] = useState<string>('gray');
   const [shifts, setShifts] = useState<any[]>([]);
   const { user: currentUser } = useAuth();
+
+
+  const fetchOperatorsAndMolds = async () => {
+      try {
+        let operators: User[] = [];
+        if (currentUser?.role === 'admin') {
+          // For admin, fetch all operators
+          operators = await apiService.getUsers();
+        } else {
+          // For operators, fetch only the current operator
+          const operator = await apiService.getCurrentUser();
+          operators = [operator];
+        }
+        
+        // Filter to only operators
+        operators = operators.filter(u => u.role === 'operator');
+        
+        // Fetch molds
+        const molds = await apiService.getMolds();
+        
+        setAvailableOperators(operators);
+        setAvailableMolds(molds);
+        return {operators, molds};
+      } catch (error) {
+        console.error('Failed to fetch operators and molds:', error);
+        return { operators: [], molds: [] };
+      }
+  };
 
   // Update current time every minute
   useEffect(() => {
@@ -700,34 +730,8 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   }, [initialData]);
 
   useEffect(() => {
-    const fetchOperatorsAndMolds = async () => {
-      try {
-        let operators: User[] = [];
-        if (currentUser?.role === 'admin') {
-          // For admin, fetch all operators
-          operators = await apiService.getUsers();
-        } else {
-          // For operators, fetch only the current operator
-          const operator = await apiService.getCurrentUser();
-          operators = [operator];
-        }
-        
-        // Filter to only operators
-        operators = operators.filter(u => u.role === 'operator');
-        
-        // Fetch molds
-        const molds = await apiService.getMolds();
-        
-        setAvailableOperators(operators);
-        setAvailableMolds(molds);
-      } catch (error) {
-        console.error('Failed to fetch operators and molds:', error);
-      }
-    };
-
     fetchOperatorsAndMolds();
   }, [currentUser]);
-
 
   // Set up socket listeners for real-time updates
   useEffect(() => {
@@ -875,19 +879,20 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       }
     };
 
-
-    const handleProductionAssignmentUpdated = (update: any) => {
-      if (update.machineId === machineId) {
+    const handleProductionAssignmentUpdated = async (update: any) => {
+    if (update.machineId === machineId) {
+      try {
+        // Get fresh operators/molds data
+        const { operators, molds } = await fetchOperatorsAndMolds();
+        
         setData(prevData => {
           const newData = [...prevData];
           const dayIndex = newData.findIndex(day => day.date === update.date);
           
           if (dayIndex >= 0) {
-            // Update all affected hours
             update.hours.forEach((targetHour: number) => {
               let hourIndex = newData[dayIndex].hours.findIndex(h => h.hour === targetHour);
 
-              // Create hour if doesn't exist
               if (hourIndex === -1) {
                 const newHour: ProductionHour = {
                   hour: targetHour,
@@ -905,41 +910,37 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
               }
 
               if (hourIndex >= 0) {
+                // Update operator using fresh data
                 if (update.operatorId !== null) {
-                  const operator = availableOperators.find(op => 
-                    op.id === update.operatorId
-                  );
-                  if (operator) {
-                    newData[dayIndex].hours[hourIndex].operator = operator;
-                  } 
+                  const operator = operators.find(op => op.id === update.operatorId);
+                  newData[dayIndex].hours[hourIndex].operator = operator || undefined;
                 } else {
-                    newData[dayIndex].hours[hourIndex].operator = undefined;
+                  newData[dayIndex].hours[hourIndex].operator = undefined;
                 }
                 
+                // Update mold using fresh data
                 if (update.moldId !== null) {
-                  const mold = availableMolds.find(m => m._id === update.moldId);
-                  if (mold) {
-                    newData[dayIndex].hours[hourIndex].mold = mold;
-                  }
+                  const mold = molds.find(m => m._id === update.moldId);
+                  newData[dayIndex].hours[hourIndex].mold = mold || undefined;
                 } else {
-                    newData[dayIndex].hours[hourIndex].mold = undefined;
-                  }
+                  newData[dayIndex].hours[hourIndex].mold = undefined;
+                }
                 
-                // Only update defective units for the original hour
+                // Update defects only for original hour
                 if (targetHour === update.originalHour && update.defectiveUnits !== undefined) {
                   newData[dayIndex].hours[hourIndex].defectiveUnits = update.defectiveUnits;
                 }
               }
-              
             });
           }
-
-
           return newData;
         });
+      } catch (error) {
+        console.error('Failed to update assignment:', error);
       }
-      fetchData();
+    }
     };
+
 
     const handleStoppageUpdated = (update: any) => {
       if (update.machineId === machineId) {
@@ -994,37 +995,6 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       socketService.leaveMachine(machineId);
     };
   }, [machineId, availableOperators, availableMolds]);
-
-     const fetchData = async () => {
-      try {
-        let operators: User[] = [];
-        if (currentUser?.role === 'admin') {
-          const response = await apiService.getUsers();
-          operators = response.users;
-        }
-        else {
-          // Fetch only current operator
-          const operator = await apiService.getCurrentOperator();
-          operators = [operator];
-        }
-        
-        operators = operators.filter(u => u.role === 'operator');
-        const molds = await apiService.getMolds();
-        
-        setAvailableOperators(operators);
-        setAvailableMolds(molds);
-      } catch (error) {
-        console.error('Failed to fetch operators and molds:', error);
-      }
-    };
-
-  // Fetch operators and molds
-  useEffect(() => {
-    fetchData();
-  }, [currentUser]);
-
-
-
 
   // Fetch shifts
   useEffect(() => {
