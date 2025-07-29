@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { Mold, Department } from '../types';
 import apiService from '../services/api';
 import { 
-  PackagePlus, 
   Plus, 
   Edit, 
   Trash2, 

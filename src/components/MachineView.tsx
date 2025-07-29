@@ -5,9 +5,8 @@ import apiService from '../services/api';
 import socketService from '../services/socket';
 import ProductionTimeline from './ProductionTimeline';
 import { ToastContainer, toast } from 'react-toastify';
-import { format, isToday } from 'date-fns';
+import { format } from 'date-fns';
 import 'react-toastify/dist/ReactToastify.css';
-
 import {
   ArrowLeft,
   Activity,
@@ -257,7 +256,7 @@ const MachineView: React.FC = () => {
         ...data
       });
       toast.success('Production data updated');
-      fetchStats(); // Add this line
+      fetchStats();
       fetchMachineData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message :'Failed to update production data');
