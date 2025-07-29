@@ -2,6 +2,7 @@ const express = require('express');
 const Sensor = require('../models/Sensor');
 const SensorPinMapping = require('../models/SensorPinMapping');
 const { auth, adminAuth } = require('../middleware/auth');
+const Machine = require('../models/Machine')
 
 const router = express.Router();
 

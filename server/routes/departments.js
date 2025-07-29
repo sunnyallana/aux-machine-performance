@@ -17,13 +17,14 @@ router.get('/', auth, async (req, res) => {
 
     const departments = await Department.find(query).lean();
     
-    // Add machine counts to each department
     const departmentsWithCounts = await Promise.all(departments.map(async dept => {
-      const machineCount = await Machine.countDocuments({ 
-        departmentId: dept._id, 
-        isActive: true 
+      const machines = await Machine.find({
+        departmentId: dept._id,
+        isActive: true
       });
-      return { ...dept, machineCount };
+
+      const machineCount = machines.length;
+      return { ...dept, machines, machineCount };
     }));
 
     res.json(departmentsWithCounts);
@@ -81,11 +82,12 @@ router.get('/admin/all', auth, adminAuth, async (req, res) => {
 
     // Add machine counts to each department
     const departmentsWithCounts = await Promise.all(departments.map(async dept => {
-      const machineCount = await Machine.countDocuments({ 
-        departmentId: dept._id, 
-        isActive: true 
+      const machines = await Machine.find({
+        departmentId: dept._id,
+        isActive: true
       });
-      return { ...dept, machineCount };
+      const machineCount = machines.length;
+      return { ...dept, machines, machineCount };
     }));
 
     // Calculate pagination info
