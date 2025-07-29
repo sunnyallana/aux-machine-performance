@@ -699,6 +699,36 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
     }
   }, [initialData]);
 
+  useEffect(() => {
+    const fetchOperatorsAndMolds = async () => {
+      try {
+        let operators: User[] = [];
+        if (currentUser?.role === 'admin') {
+          // For admin, fetch all operators
+          operators = await apiService.getUsers();
+        } else {
+          // For operators, fetch only the current operator
+          const operator = await apiService.getCurrentUser();
+          operators = [operator];
+        }
+        
+        // Filter to only operators
+        operators = operators.filter(u => u.role === 'operator');
+        
+        // Fetch molds
+        const molds = await apiService.getMolds();
+        
+        setAvailableOperators(operators);
+        setAvailableMolds(molds);
+      } catch (error) {
+        console.error('Failed to fetch operators and molds:', error);
+      }
+    };
+
+    fetchOperatorsAndMolds();
+  }, [currentUser]);
+
+
   // Set up socket listeners for real-time updates
   useEffect(() => {
     socketService.connect();
