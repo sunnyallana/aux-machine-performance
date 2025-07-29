@@ -20,11 +20,84 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Get all molds for admin
+// Get paginated molds for admin
 router.get('/admin/all', auth, adminAuth, async (req, res) => {
   try {
-    const molds = await Mold.find({}).populate('departmentId');
-    res.json(molds);
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      department = '',
+      isActive = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Convert page and limit to numbers
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build search query
+    let query = {};
+
+    // Text search across name, description
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by department
+    if (department.trim()) {
+      query.departmentId = department;
+    }
+
+    // Filter by active status
+    if (isActive !== '') {
+      query.isActive = isActive === 'true';
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute queries
+    const [molds, totalMolds] = await Promise.all([
+      Mold.find(query)
+        .populate('departmentId')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limitNum),
+      Mold.countDocuments(query)
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalMolds / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
+
+    res.json({
+      molds,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalMolds,
+        limit: limitNum,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? pageNum + 1 : null,
+        prevPage: hasPrevPage ? pageNum - 1 : null
+      },
+      filters: {
+        search,
+        department,
+        isActive,
+        sortBy,
+        sortOrder
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

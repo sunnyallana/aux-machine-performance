@@ -214,7 +214,7 @@ const ProductionModal: React.FC<ProductionModalProps> = ({
       hours: applyToShift && shiftInfo ? shiftInfo.hours : [hour.hour],
       originalHour: hour.hour,
       operatorId: operatorId,
-      moldId: assignmentForm.moldId,
+      moldId: moldId,
       defectiveUnits: assignmentForm.defectiveUnits
     });
 
@@ -881,7 +881,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                   );
                   if (operator) {
                     newData[dayIndex].hours[hourIndex].operator = operator;
-                  }
+                  } 
                 } else {
                     newData[dayIndex].hours[hourIndex].operator = undefined;
                 }
@@ -900,8 +900,11 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
                   newData[dayIndex].hours[hourIndex].defectiveUnits = update.defectiveUnits;
                 }
               }
+              
             });
           }
+
+
           return newData;
         });
       }
@@ -966,11 +969,7 @@ const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
       try {
         let operators: User[] = [];
         if (currentUser?.role === 'admin') {
-          const response = await apiService.getUsers({
-            role: 'operator',
-            isActive: 'true',
-            limit: 1000
-          });
+          const response = await apiService.getUsers();
           operators = response.users;
         }
         else {

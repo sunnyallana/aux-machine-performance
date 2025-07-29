@@ -15,15 +15,99 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Get all sensors for admin (including inactive)
+// Add this new endpoint for paginated sensors
 router.get('/admin/all', auth, adminAuth, async (req, res) => {
   try {
-    const sensors = await Sensor.find({})
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      department = '',
+      status = '',
+      sensorType = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Convert page and limit to numbers
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build the base query
+    let query = {};
+
+    // Text search across multiple fields
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { sensorType: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by department
+    if (department.trim()) {
+      // We need to get the machine IDs that belong to this department
+      const machinesInDepartment = await Machine.find({ departmentId: department }).select('_id');
+      const machineIds = machinesInDepartment.map(m => m._id);
+      query.machineId = { $in: machineIds };
+    }
+
+    // Filter by status
+    if (status !== '') {
+      query.isActive = status === 'true';
+    }
+
+    // Filter by sensor type
+    if (sensorType.trim()) {
+      query.sensorType = sensorType;
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query to get paginated results
+    const sensorsQuery = Sensor.find(query)
       .populate({
         path: 'machineId',
         populate: { path: 'departmentId' }
-      });
-    res.json(sensors);
+      })
+      .sort(sortObj)
+      .skip(skip)
+      .limit(limitNum);
+
+    const totalSensorsQuery = Sensor.countDocuments(query);
+
+    const [sensors, totalSensors] = await Promise.all([sensorsQuery, totalSensorsQuery]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalSensors / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
+
+    res.json({
+      sensors,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalSensors,
+        limit: limitNum,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? pageNum + 1 : null,
+        prevPage: hasPrevPage ? pageNum - 1 : null
+      },
+      filters: {
+        search,
+        department,
+        status,
+        sensorType,
+        sortBy,
+        sortOrder
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

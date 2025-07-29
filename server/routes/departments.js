@@ -32,6 +32,91 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// Get all paginated departments 
+router.get('/admin/all', auth, adminAuth, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      isActive = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Convert page and limit to numbers
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build search query
+    let query = {};
+
+    // Text search across name, description
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by active status
+    if (isActive !== '') {
+      query.isActive = isActive === 'true';
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute queries
+    const [departments, totalDepartments] = await Promise.all([
+      Department.find(query)
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Department.countDocuments(query)
+    ]);
+
+    // Add machine counts to each department
+    const departmentsWithCounts = await Promise.all(departments.map(async dept => {
+      const machineCount = await Machine.countDocuments({ 
+        departmentId: dept._id, 
+        isActive: true 
+      });
+      return { ...dept, machineCount };
+    }));
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalDepartments / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
+
+    res.json({
+      departments: departmentsWithCounts,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalDepartments,
+        limit: limitNum,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? pageNum + 1 : null,
+        prevPage: hasPrevPage ? pageNum - 1 : null
+      },
+      filters: {
+        search,
+        isActive,
+        sortBy,
+        sortOrder
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Get department by ID with machines
 router.get('/:id', auth, async (req, res) => {
   try {

@@ -336,7 +336,6 @@ router.post('/stoppage', auth, async (req, res) => {
 });
 
 // Update production assignment
-// Update production assignment
 router.post('/production-assignment', auth, async (req, res) => {
   try {
     const { machineId, hour, date, operatorId, moldId, defectiveUnits, applyToShift } = req.body;

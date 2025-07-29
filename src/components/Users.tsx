@@ -96,7 +96,7 @@ const Users: React.FC = () => {
         ...(isActive !== '' && { isActive })
       };
 
-      const data: UsersResponse = await apiService.getUsers(params);
+      const data: UsersResponse = await apiService.getUsersAdmin(params);
       setUsersData(data);
       setCurrentPage(data.pagination.currentPage);
     } catch (err) {

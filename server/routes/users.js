@@ -4,8 +4,28 @@ const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Get all users without pagination and search
+router.get('/', auth, async (req, res) => {
+  try {
+    let query = { isActive: true };
+    
+    // Operators only see users in their department
+    if (req.user.role === 'operator' && req.user.departmentId) {
+      query.departmentId = req.user.departmentId;
+    }
+
+    const users = await User.find(query)
+      .populate('departmentId', 'name _id')
+      .select('-password');
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Get all users with pagination and search (Admin only)
-router.get('/', auth, adminAuth, async (req, res) => {
+router.get('/admin/all', auth, adminAuth, async (req, res) => {
   try {
     const {
       page = 1,

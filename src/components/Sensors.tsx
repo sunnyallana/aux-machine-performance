@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Sensor, Machine, Department } from '../types';
 import apiService from '../services/api';
@@ -17,10 +16,37 @@ import {
   Gauge,
   Zap,
   RotateCcw,
-  Building2
+  Building2,
+  Filter,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
+interface PaginationData {
+  currentPage: number;
+  totalPages: number;
+  totalSensors: number;
+  limit: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+interface SensorsResponse {
+  sensors: Sensor[];
+  pagination: PaginationData;
+  filters: {
+    search: string;
+    department: string;
+    status: string;
+    sensorType: string;
+    sortBy: string;
+    sortOrder: string;
+  };
+}
 
 interface SensorFormData {
   name: string;
@@ -32,14 +58,24 @@ interface SensorFormData {
 
 const Sensors: React.FC = () => {
   const { isAdmin } = useAuth();
-  const [sensors, setSensors] = useState<Sensor[]>([]);
-  const [machines, setMachines] = useState<Machine[]>([]);
+  const [sensorsData, setSensorsData] = useState<SensorsResponse | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Pagination and filtering states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sensorTypeFilter, setSensorTypeFilter] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Modal states
   const [showForm, setShowForm] = useState(false);
   const [editingSensor, setEditingSensor] = useState<Sensor | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<SensorFormData>({
     name: '',
     description: '',
@@ -50,79 +86,86 @@ const Sensors: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusTogglingId, setStatusTogglingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchData();
-    }
-  }, [isAdmin]);
+  // Debounced search
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (selectedDepartment) {
-      fetchMachinesByDepartment(selectedDepartment);
-    }
-  }, [selectedDepartment]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async (page = 1, search = '', department = '', status = '', sensorType = '') => {
     try {
       setLoading(true);
-      const [sensorsData, departmentsData, machinesData] = await Promise.all([
-        apiService.getSensorsForAdmin(),
-        apiService.getDepartments(),
-        apiService.getMachines()
+      
+      const params = {
+        page,
+        limit: pageSize,
+        sortBy,
+        sortOrder,
+        ...(search && { search }),
+        ...(department && { department }),
+        ...(status !== '' && { status }),
+        ...(sensorType && { sensorType })
+      };
+
+      const [sensorsResponse, departmentsData] = await Promise.all([
+        apiService.getSensorsAdmin(params),
+        apiService.getDepartments()
       ]);
-      setSensors(sensorsData);
+      
+      setSensorsData(sensorsResponse);
       setDepartments(departmentsData);
-      setMachines(machinesData);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch data';
       toast.error(message);
     } finally {
       setLoading(false);
     }
+  }, [pageSize, sortBy, sortOrder]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      if (searchTerm !== (sensorsData?.filters.search || '')) {
+        fetchData(1, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
+      }
+    }, 500);
+
+    setSearchTimeout(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [searchTerm]);
+
+  useEffect(() => {
+    fetchData(1, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
+  }, [fetchData, departmentFilter, statusFilter, sensorTypeFilter, sortBy, sortOrder]);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && sensorsData && page <= sensorsData.pagination.totalPages) {
+      fetchData(page, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
+    }
   };
 
-  const refreshData = async () => {
-    try {
-      const [sensorsData, departmentsData, machinesData] = await Promise.all([
-        apiService.getSensorsForAdmin(),
-        apiService.getDepartments(),
-        apiService.getMachines()
-      ]);
-      setSensors(sensorsData);
-      setDepartments(departmentsData);
-      setMachines(machinesData);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to refresh data';
-      toast.error(message);
-    }
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+    fetchData(1, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setDepartmentFilter('');
+    setStatusFilter('');
+    setSensorTypeFilter('');
+    setSortBy('createdAt');
+    setSortOrder('desc');
+    setCurrentPage(1);
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-  };
-
-  const filteredSensors = sensors.filter(sensor => {
-    const lowerSearch = searchTerm.toLowerCase();
-    const machine = (sensor.machineId as Machine);
-    const department = (machine.departmentId as Department);
-    
-    return (
-      sensor.name.toLowerCase().includes(lowerSearch) ||
-      (sensor.description && sensor.description.toLowerCase().includes(lowerSearch)) ||
-      sensor.sensorType.toLowerCase().includes(lowerSearch) ||
-      machine.name.toLowerCase().includes(lowerSearch) ||
-      department.name.toLowerCase().includes(lowerSearch)
-    );
-  });
-
-  const fetchMachinesByDepartment = async (departmentId: string) => {
-    try {
-      const machinesData = await apiService.getMachinesByDepartment(departmentId);
-      setMachines(machinesData);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch machines';
-      toast.error(message);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +181,7 @@ const Sensors: React.FC = () => {
       }
       
       resetForm();
-      refreshData();
+      fetchData(currentPage, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
     } catch (err) {
       let message = 'Failed to save sensor';
       
@@ -164,10 +207,10 @@ const Sensors: React.FC = () => {
       description: sensor.description || '',
       machineId: machine._id,
       isActive: sensor.isActive,
-      sensorType: sensor.sensorType
+      sensorType: sensor.sensorType as any
     });
     
-    setSelectedDepartment(department._id);
+    setDepartmentFilter(department._id);
     setShowForm(true);
   };
 
@@ -175,8 +218,10 @@ const Sensors: React.FC = () => {
     try {
       setStatusTogglingId(id);
       await apiService.updateSensor(id, { isActive: !isActive });
-      refreshData();
       toast.success(`Sensor ${!isActive ? 'activated' : 'deactivated'} successfully`);
+      
+      // Refresh the current page
+      fetchData(currentPage, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update sensor status';
       toast.error(message);
@@ -191,8 +236,14 @@ const Sensors: React.FC = () => {
     try {
       setDeletingId(sensorId);
       await apiService.deleteSensor(sensorId);
-      refreshData();
       toast.success('Sensor deleted successfully');
+      
+      // If we're on the last page and it becomes empty, go to previous page
+      if (sensorsData && sensorsData.sensors.length === 1 && currentPage > 1) {
+        fetchData(currentPage - 1, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
+      } else {
+        fetchData(currentPage, searchTerm, departmentFilter, statusFilter, sensorTypeFilter);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete sensor';
       toast.error(message);
@@ -210,7 +261,7 @@ const Sensors: React.FC = () => {
       sensorType: 'power'
     });
     setEditingSensor(null);
-    setSelectedDepartment('');
+    setDepartmentFilter('');
     setShowForm(false);
   };
 
@@ -236,6 +287,80 @@ const Sensors: React.FC = () => {
     }
   };
 
+  const Pagination = ({ pagination }: { pagination: PaginationData }) => {
+    if (pagination.totalPages <= 1) return null;
+
+    const getPageNumbers = () => {
+      const pages = [];
+      const maxVisible = 5;
+      let start = Math.max(1, pagination.currentPage - Math.floor(maxVisible / 2));
+      let end = Math.min(pagination.totalPages, start + maxVisible - 1);
+      
+      if (end - start + 1 < maxVisible) {
+        start = Math.max(1, end - maxVisible + 1);
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      
+      return pages;
+    };
+
+    return (
+      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-t border-gray-700">
+        <div className="flex items-center text-sm text-gray-400">
+          Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+          {Math.min(pagination.currentPage * pagination.limit, pagination.totalSensors)} of{' '}
+          {pagination.totalSensors} results
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <select
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+            className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+          >
+            <option value={5}>5 per page</option>
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+            <option value={50}>50 per page</option>
+          </select>
+          
+          <button
+            onClick={() => handlePageChange(pagination.currentPage - 1)}
+            disabled={!pagination.hasPrevPage}
+            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          
+          {getPageNumbers().map(page => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-3 py-1 rounded text-sm ${
+                page === pagination.currentPage
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          
+          <button
+            onClick={() => handlePageChange(pagination.currentPage + 1)}
+            disabled={!pagination.hasNextPage}
+            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!isAdmin) {
     return (
       <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
@@ -251,13 +376,8 @@ const Sensors: React.FC = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  const sensors = sensorsData?.sensors || [];
+  const pagination = sensorsData?.pagination;
 
   return (
     <div className="space-y-6">
@@ -274,7 +394,7 @@ const Sensors: React.FC = () => {
         theme="dark"
       />
       
-      {/* Header - Matches Departments */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <Cpu className="h-8 w-8 text-blue-400" />
@@ -296,7 +416,24 @@ const Sensors: React.FC = () => {
               value={searchTerm}
               onChange={handleSearch}
             />
+            {loading && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <Loader className="h-4 w-4 animate-spin text-gray-400" />
+              </div>
+            )}
           </div>
+          
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center space-x-2 px-4 py-2 border rounded-md transition-colors ${
+              showFilters 
+                ? 'bg-blue-600 border-blue-600 text-white' 
+                : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+            }`}
+          >
+            <Filter className="h-4 w-4" />
+            <span>Filters</span>
+          </button>
           
           <button
             onClick={() => setShowForm(true)}
@@ -308,42 +445,125 @@ const Sensors: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats - Matches Departments */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-between">
+      {/* Filters Panel */}
+      {showFilters && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-gray-400">Total Sensors</p>
-              <p className="text-xl font-semibold text-white">{sensors.length}</p>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Department</label>
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Departments</option>
+                {departments.map(dept => (
+                  <option key={dept._id} value={dept._id}>{dept.name}</option>
+                ))}
+              </select>
             </div>
-            <Cpu className="h-8 w-8 text-blue-400" />
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Sensor Type</label>
+              <select
+                value={sensorTypeFilter}
+                onChange={(e) => setSensorTypeFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Types</option>
+                <option value="power">Power</option>
+                <option value="unit-cycle">Unit Cycle</option>
+                <option value="temperature">Temperature</option>
+                <option value="pressure">Pressure</option>
+                <option value="vibration">Vibration</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Sort By</label>
+              <div className="flex space-x-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="name">Name</option>
+                  <option value="createdAt">Created Date</option>
+                </select>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="asc">↑</option>
+                  <option value="desc">↓</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+            >
+              Clear Filters
+            </button>
           </div>
         </div>
+      )}
 
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400">Active Sensors</p>
-              <p className="text-xl font-semibold text-green-400">
-                {sensors.filter(s => s.isActive).length}
-              </p>
+      {/* Stats */}
+      {pagination && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Total Sensors</p>
+                <p className="text-xl font-semibold text-white">{pagination.totalSensors}</p>
+              </div>
+              <Cpu className="h-8 w-8 text-blue-400" />
             </div>
-            <Power className="h-8 w-8 text-green-400" />
           </div>
-        </div>
 
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400">Inactive Sensors</p>
-              <p className="text-xl font-semibold text-red-400">
-                {sensors.filter(s => !s.isActive).length}
-              </p>
+          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Current Page</p>
+                <p className="text-xl font-semibold text-green-400">
+                  {pagination.currentPage} of {pagination.totalPages}
+                </p>
+              </div>
+              <Power className="h-8 w-8 text-green-400" />
             </div>
-            <PowerOff className="h-8 w-8 text-red-400" />
+          </div>
+
+          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Showing</p>
+                <p className="text-xl font-semibold text-yellow-400">
+                  {sensors.length} sensors
+                </p>
+              </div>
+              <Cpu className="h-8 w-8 text-yellow-400" />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Sensor Form Modal */}
       {showForm && (
@@ -412,8 +632,8 @@ const Sensors: React.FC = () => {
                 </label>
                 <select
                   required
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select department</option>
@@ -434,14 +654,16 @@ const Sensors: React.FC = () => {
                   value={formData.machineId}
                   onChange={(e) => setFormData({ ...formData, machineId: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={!selectedDepartment}
+                  disabled={!departmentFilter}
                 >
                   <option value="">Select machine</option>
-                  {machines.map((machine) => (
-                    <option key={machine._id} value={machine._id}>
-                      {machine.name}
-                    </option>
-                  ))}
+                  {departments
+                    .find(d => d._id === departmentFilter)
+                    ?.machines?.map((machine) => (
+                      <option key={machine._id} value={machine._id}>
+                        {machine.name}
+                      </option>
+                    )) || []}
                 </select>
               </div>
 
@@ -485,7 +707,7 @@ const Sensors: React.FC = () => {
         </div>
       )}
 
-      {/* Sensors Table - Matches Departments */}
+      {/* Sensors Table */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-700">
@@ -512,8 +734,16 @@ const Sensors: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-gray-800 divide-y divide-gray-700">
-              {filteredSensors.length > 0 ? (
-                filteredSensors.map((sensor) => {
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center">
+                    <div className="flex justify-center">
+                      <Loader className="h-6 w-6 animate-spin text-blue-500" />
+                    </div>
+                  </td>
+                </tr>
+              ) : sensors.length > 0 ? (
+                sensors.map((sensor) => {
                   const machine = (sensor.machineId as Machine);
                   const department = (machine.departmentId as Department);
                   
@@ -615,8 +845,8 @@ const Sensors: React.FC = () => {
                       <Cpu className="h-12 w-12 text-gray-600 mb-4" />
                       <h3 className="text-lg font-medium text-gray-400 mb-2">No sensors found</h3>
                       <p className="text-gray-500 max-w-md">
-                        {searchTerm 
-                          ? `No sensors match your search for "${searchTerm}"` 
+                        {searchTerm || departmentFilter || statusFilter !== '' || sensorTypeFilter !== ''
+                          ? 'No sensors match your current filters' 
                           : 'Get started by creating your first sensor'}
                       </p>
                       <button 
@@ -632,6 +862,9 @@ const Sensors: React.FC = () => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {pagination && !loading && <Pagination pagination={pagination} />}
       </div>
     </div>
   );

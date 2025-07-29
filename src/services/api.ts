@@ -69,6 +69,34 @@ class ApiService {
     return this.request(`/departments/${id}`);
   }
 
+  async getDepartmentsAdmin(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    isActive?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    let endpoint = '/departments/admin/all';
+    
+    if (params) {
+      const searchParams = new URLSearchParams();
+      
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+      if (params.search) searchParams.append('search', params.search);
+      if (params.isActive) searchParams.append('isActive', params.isActive);
+      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
+      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
+      
+      if (searchParams.toString()) {
+        endpoint += `?${searchParams.toString()}`;
+      }
+    }
+    
+    return this.request(endpoint);
+    }
+
   async createDepartment(department: any) {
     return this.request('/departments', {
       method: 'POST',
@@ -139,7 +167,11 @@ class ApiService {
 
   // Users
 
-   async getUsers(params?: {
+  async getUsers() {
+    return this.request('/users');
+  }
+  
+   async getUsersAdmin(params?: {
     page?: number;
     limit?: number;
     search?: string;
@@ -149,7 +181,7 @@ class ApiService {
     sortBy?: string;
     sortOrder?: string;
   }) {
-    let endpoint = '/users';
+    let endpoint = '/users/admin/all';
     
     if (params) {
       const searchParams = new URLSearchParams();
@@ -246,8 +278,36 @@ class ApiService {
     return this.request(`/sensors/machine/${machineId}`);
   }
 
-  async getSensorsForAdmin() {
-    return this.request('/sensors/admin/all');
+  async getSensorsAdmin(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    department?: string;
+    status?: string;
+    sensorType?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    let endpoint = '/sensors/admin/all';
+    
+    if (params) {
+      const searchParams = new URLSearchParams();
+      
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+      if (params.search) searchParams.append('search', params.search);
+      if (params.department) searchParams.append('department', params.department);
+      if (params.status) searchParams.append('status', params.status);
+      if (params.sensorType) searchParams.append('sensorType', params.sensorType);
+      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
+      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
+      
+      if (searchParams.toString()) {
+        endpoint += `?${searchParams.toString()}`;
+      }
+    }
+    
+    return this.request(endpoint);
   }
 
   async createSensor(sensor: any) {
@@ -292,8 +352,34 @@ class ApiService {
     return this.request('/molds');
   }
 
-  async getAllMolds() {
-    return this.request('/molds/admin/all');
+  async getMoldsAdmin(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    department?: string;
+    isActive?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    let endpoint = '/molds/admin/all';
+    
+    if (params) {
+      const searchParams = new URLSearchParams();
+      
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+      if (params.search) searchParams.append('search', params.search);
+      if (params.department) searchParams.append('department', params.department);
+      if (params.isActive) searchParams.append('isActive', params.isActive);
+      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
+      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
+      
+      if (searchParams.toString()) {
+        endpoint += `?${searchParams.toString()}`;
+      }
+    }
+    
+    return this.request(endpoint);
   }
 
   async createMold(mold: any) {
