@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Department, Machine } from '../types';
 import apiService from '../services/api';
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { ThemeContext } from '../App';
 
 interface Report {
   _id: string;
@@ -58,6 +59,7 @@ interface Report {
 
 const Reports: React.FC = () => {
   const { isAdmin } = useAuth();
+  const { isDarkMode } = useContext(ThemeContext);
   const [reports, setReports] = useState<Report[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -75,6 +77,23 @@ const Reports: React.FC = () => {
     departmentId: '',
     machineId: ''
   });
+
+  // Theme classes
+  const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const cardBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const cardBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textSecondaryClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-white';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+  const tableHeaderClass = isDarkMode ? 'bg-gray-750' : 'bg-gray-50';
+  const tableRowHoverClass = isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50';
+  const buttonPrimaryClass = isDarkMode 
+    ? 'bg-blue-600 hover:bg-blue-700' 
+    : 'bg-blue-600 hover:bg-blue-700';
+  const buttonSecondaryClass = isDarkMode 
+    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+    : 'border-gray-300 text-gray-700 hover:bg-gray-50';
 
   useEffect(() => {
     fetchData();
@@ -215,20 +234,20 @@ const Reports: React.FC = () => {
 
   const getReportTypeColor = (type: string) => {
     switch (type) {
-      case 'daily': return 'bg-blue-900/50 text-blue-400';
-      case 'weekly': return 'bg-green-900/50 text-green-400';
-      case 'monthly': return 'bg-yellow-900/50 text-yellow-400';
-      case 'yearly': return 'bg-purple-900/50 text-purple-400';
-      default: return 'bg-gray-900/50 text-gray-400';
+      case 'daily': return isDarkMode ? 'bg-blue-900/50 text-blue-400' : 'bg-blue-100 text-blue-800';
+      case 'weekly': return isDarkMode ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-800';
+      case 'monthly': return isDarkMode ? 'bg-yellow-900/50 text-yellow-400' : 'bg-yellow-100 text-yellow-800';
+      case 'yearly': return isDarkMode ? 'bg-purple-900/50 text-purple-400' : 'bg-purple-100 text-purple-800';
+      default: return isDarkMode ? 'bg-gray-900/50 text-gray-400' : 'bg-gray-100 text-gray-800';
     }
   };
 
   if (!isAdmin) {
     return (
-      <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
+      <div className={`${isDarkMode ? 'bg-red-900/50 border-red-500' : 'bg-red-100 border-red-300'} border px-4 py-3 rounded-md`}>
         <div className="flex items-center">
           <AlertTriangle className="h-4 w-4 mr-2" />
-          <span>Access denied. Admin privileges required.</span>
+          <span className={textClass}>Access denied. Admin privileges required.</span>
         </div>
       </div>
     );
@@ -243,7 +262,7 @@ const Reports: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${bgClass} min-h-screen p-4`}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -254,32 +273,32 @@ const Reports: React.FC = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="dark"
+        theme={isDarkMode ? "dark" : "light"}
       />
       
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <FileText className="h-8 w-8 text-blue-400" />
+        <FileText className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
         <div>
-          <h1 className="text-2xl font-bold text-white">Production Reports</h1>
-          <p className="text-gray-400">Generate and manage OEE, MTTR, and MTBF reports</p>
+          <h1 className={`text-2xl font-bold ${textClass}`}>Production Reports</h1>
+          <p className={textSecondaryClass}>Generate and manage OEE, MTTR, and MTBF reports</p>
         </div>
       </div>
 
       {/* Generate Report Form */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Generate New Report</h2>
+      <div className={`rounded-lg border p-6 ${cardBgClass} ${cardBorderClass}`}>
+        <h2 className={`text-lg font-semibold ${textClass} mb-4`}>Generate New Report</h2>
         
         <form onSubmit={handleGenerateReport} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${textSecondaryClass}`}>
                 Report Type
               </label>
               <select
                 value={reportForm.type}
                 onChange={(e) => setReportForm({...reportForm, type: e.target.value as any})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
@@ -289,37 +308,37 @@ const Reports: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${textSecondaryClass}`}>
                 Start Date
               </label>
               <input
                 type="date"
                 value={reportForm.startDate}
                 onChange={(e) => setReportForm({...reportForm, startDate: e.target.value})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${textSecondaryClass}`}>
                 End Date
               </label>
               <input
                 type="date"
                 value={reportForm.endDate}
                 onChange={(e) => setReportForm({...reportForm, endDate: e.target.value})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${textSecondaryClass}`}>
                 Department (Optional)
               </label>
               <select
                 value={reportForm.departmentId}
                 onChange={(e) => setReportForm({...reportForm, departmentId: e.target.value})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Departments</option>
                 {departments.map((dept) => (
@@ -331,13 +350,13 @@ const Reports: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${textSecondaryClass}`}>
                 Machine (Optional)
               </label>
               <select
                 value={reportForm.machineId}
                 onChange={(e) => setReportForm({...reportForm, machineId: e.target.value})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Machines</option>
                 {machines.map((machine) => (
@@ -353,7 +372,7 @@ const Reports: React.FC = () => {
             <button
               type="submit"
               disabled={generating}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className={`flex items-center space-x-2 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md disabled:opacity-50 transition-colors`}
             >
               {generating ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -367,14 +386,14 @@ const Reports: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+      <div className={`rounded-lg border p-4 ${cardBgClass} ${cardBorderClass}`}>
         <div className="flex items-center space-x-4">
-          <Filter className="h-5 w-5 text-gray-400" />
+          <Filter className={`h-5 w-5 ${textSecondaryClass}`} />
           <div className="flex space-x-4 flex-1">
             <select
               value={filters.type}
               onChange={(e) => setFilters({...filters, type: e.target.value})}
-              className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
             >
               <option value="">All Types</option>
               <option value="daily">Daily</option>
@@ -386,7 +405,7 @@ const Reports: React.FC = () => {
             <select
               value={filters.departmentId}
               onChange={(e) => setFilters({...filters, departmentId: e.target.value})}
-              className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
             >
               <option value="">All Departments</option>
               {departments.map((dept) => (
@@ -400,39 +419,39 @@ const Reports: React.FC = () => {
       </div>
 
       {/* Reports List */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">Generated Reports</h2>
+      <div className={`rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
+        <div className={`p-6 border-b ${cardBorderClass}`}>
+          <h2 className={`text-lg font-semibold ${textClass}`}>Generated Reports</h2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-700">
-            <thead className="bg-gray-750">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className={tableHeaderClass}>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Report
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Period
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Key Metrics
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Generated
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-right text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-gray-800 divide-y divide-gray-700">
+            <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {reports.map((report) => (
-                <tr key={report._id} className="hover:bg-gray-750">
+                <tr key={report._id} className={tableRowHoverClass}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
-                        <FileText className="h-8 w-8 text-blue-400" />
+                        <FileText className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
                       </div>
                       <div className="ml-4">
                         <div className="flex items-center space-x-2">
@@ -440,43 +459,51 @@ const Reports: React.FC = () => {
                             {report.type.toUpperCase()}
                           </span>
                           {report.emailSent && (
-                            <span className="px-2 py-1 text-xs bg-green-900/50 text-green-400 rounded-full">
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              isDarkMode ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-800'
+                            }`}>
                               Emailed
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-400 mt-1">
+                        <div className={`text-sm ${textSecondaryClass} mt-1`}>
                           {report.departmentId?.name || 'All Departments'} • {report.machineId?.name || 'All Machines'}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-white">
+                    <div className={`text-sm ${textClass}`}>
                       {new Date(report.period.start).toLocaleDateString()} - {new Date(report.period.end).toLocaleDateString()}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div className="text-center">
-                        <div className="text-yellow-400 font-semibold">{report.metrics.oee}%</div>
-                        <div className="text-gray-400">OEE</div>
+                        <div className={`font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                          {report.metrics.oee}%
+                        </div>
+                        <div className={textSecondaryClass}>OEE</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-blue-400 font-semibold">{report.metrics.mtbf}m</div>
-                        <div className="text-gray-400">MTBF</div>
+                        <div className={`font-semibold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                          {report.metrics.mtbf}m
+                        </div>
+                        <div className={textSecondaryClass}>MTBF</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-purple-400 font-semibold">{report.metrics.mttr}m</div>
-                        <div className="text-gray-400">MTTR</div>
+                        <div className={`font-semibold ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                          {report.metrics.mttr}m
+                        </div>
+                        <div className={textSecondaryClass}>MTTR</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-300">
+                    <div className={`text-sm ${textClass}`}>
                       {new Date(report.createdAt).toLocaleDateString()}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className={`text-xs ${textSecondaryClass}`}>
                       by {report.generatedBy.username ? report.generatedBy.username : 'System'}
                     </div>
                   </td>
@@ -484,21 +511,33 @@ const Reports: React.FC = () => {
                     <div className="flex justify-end space-x-2">
                       <button
                         onClick={() => handleDownloadPDF(report._id, report.type, report.period.start.split('T')[0])}
-                        className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
+                        className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                          isDarkMode 
+                            ? 'text-blue-400 hover:text-blue-300' 
+                            : 'text-blue-600 hover:text-blue-800'
+                        }`}
                         title="Download PDF"
                       >
                         <Download className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleEmailReport(report._id)}
-                        className="text-green-400 hover:text-green-300 p-1 rounded-md hover:bg-gray-700"
+                        className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                          isDarkMode 
+                            ? 'text-green-400 hover:text-green-300' 
+                            : 'text-green-600 hover:text-green-800'
+                        }`}
                         title="Email Report"
                       >
                         <Mail className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteReport(report._id)}
-                        className="text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700"
+                        className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                          isDarkMode 
+                            ? 'text-red-400 hover:text-red-300' 
+                            : 'text-red-600 hover:text-red-800'
+                        }`}
                         title="Delete Report"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -512,9 +551,9 @@ const Reports: React.FC = () => {
 
           {reports.length === 0 && (
             <div className="text-center py-12">
-              <FileText className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-400 mb-2">No reports found</h3>
-              <p className="text-gray-500">Generate your first report to get started</p>
+              <FileText className={`h-12 w-12 ${textSecondaryClass} mx-auto mb-4`} />
+              <h3 className={`text-lg font-medium ${textSecondaryClass} mb-2`}>No reports found</h3>
+              <p className={textSecondaryClass}>Generate your first report to get started</p>
             </div>
           )}
         </div>

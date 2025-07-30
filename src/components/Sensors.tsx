@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Sensor, Machine, Department } from '../types';
 import apiService from '../services/api';
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { ThemeContext } from '../App';
 
 interface PaginationData {
   currentPage: number;
@@ -58,10 +59,28 @@ interface SensorFormData {
 
 const Sensors: React.FC = () => {
   const { isAdmin } = useAuth();
+  const { isDarkMode } = useContext(ThemeContext);
   const [sensorsData, setSensorsData] = useState<SensorsResponse | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Theme classes
+  const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const cardBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const cardBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textSecondaryClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-white';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+  const tableHeaderClass = isDarkMode ? 'bg-gray-750' : 'bg-gray-50';
+  const tableRowHoverClass = isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50';
+  const buttonPrimaryClass = isDarkMode 
+    ? 'bg-blue-600 hover:bg-blue-700' 
+    : 'bg-blue-600 hover:bg-blue-700';
+  const buttonSecondaryClass = isDarkMode 
+    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+    : 'border-gray-300 text-gray-700 hover:bg-gray-50';
+
   // Pagination and filtering states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -278,12 +297,12 @@ const Sensors: React.FC = () => {
 
   const getSensorTypeColor = (type: string) => {
     switch (type) {
-      case 'power': return 'bg-yellow-400/10 text-yellow-400';
-      case 'unit-cycle': return 'bg-blue-400/10 text-blue-400';
-      case 'temperature': return 'bg-red-400/10 text-red-400';
-      case 'pressure': return 'bg-purple-400/10 text-purple-400';
-      case 'vibration': return 'bg-green-400/10 text-green-400';
-      default: return 'bg-gray-400/10 text-gray-400';
+      case 'power': return isDarkMode ? 'bg-yellow-400/10 text-yellow-400' : 'bg-yellow-100 text-yellow-800';
+      case 'unit-cycle': return isDarkMode ? 'bg-blue-400/10 text-blue-400' : 'bg-blue-100 text-blue-800';
+      case 'temperature': return isDarkMode ? 'bg-red-400/10 text-red-400' : 'bg-red-100 text-red-800';
+      case 'pressure': return isDarkMode ? 'bg-purple-400/10 text-purple-400' : 'bg-purple-100 text-purple-800';
+      case 'vibration': return isDarkMode ? 'bg-green-400/10 text-green-400' : 'bg-green-100 text-green-800';
+      default: return isDarkMode ? 'bg-gray-400/10 text-gray-400' : 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -307,9 +326,15 @@ const Sensors: React.FC = () => {
       return pages;
     };
 
+    const paginationBgClass = isDarkMode ? 'bg-gray-800' : 'bg-gray-50';
+    const paginationBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+    const paginationTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+    const paginationButtonClass = isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-700';
+    const paginationHoverClass = isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100';
+
     return (
-      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-t border-gray-700">
-        <div className="flex items-center text-sm text-gray-400">
+      <div className={`flex items-center justify-between px-6 py-3 ${paginationBgClass} border-t ${paginationBorderClass}`}>
+        <div className={`flex items-center text-sm ${paginationTextClass}`}>
           Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
           {Math.min(pagination.currentPage * pagination.limit, pagination.totalSensors)} of{' '}
           {pagination.totalSensors} results
@@ -319,7 +344,7 @@ const Sensors: React.FC = () => {
           <select
             value={pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+            className={`px-2 py-1 ${paginationButtonClass} border ${inputBorderClass} rounded text-sm`}
           >
             <option value={5}>5 per page</option>
             <option value={10}>10 per page</option>
@@ -330,7 +355,7 @@ const Sensors: React.FC = () => {
           <button
             onClick={() => handlePageChange(pagination.currentPage - 1)}
             disabled={!pagination.hasPrevPage}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-2 ${paginationTextClass} hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -342,7 +367,7 @@ const Sensors: React.FC = () => {
               className={`px-3 py-1 rounded text-sm ${
                 page === pagination.currentPage
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                  : `${paginationButtonClass} ${paginationHoverClass} ${paginationTextClass}`
               }`}
             >
               {page}
@@ -352,7 +377,7 @@ const Sensors: React.FC = () => {
           <button
             onClick={() => handlePageChange(pagination.currentPage + 1)}
             disabled={!pagination.hasNextPage}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-2 ${paginationTextClass} hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -363,14 +388,14 @@ const Sensors: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
+      <div className={`${isDarkMode ? 'bg-red-900/50 border-red-500' : 'bg-red-100 border-red-300'} border px-4 py-3 rounded-md`}>
         <div className="flex items-center">
           <div className="h-4 w-4 mr-2">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
             </svg>
           </div>
-          <span>Access denied. Admin privileges required.</span>
+          <span className={textClass}>Access denied. Admin privileges required.</span>
         </div>
       </div>
     );
@@ -380,7 +405,7 @@ const Sensors: React.FC = () => {
   const pagination = sensorsData?.pagination;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${bgClass} min-h-screen p-4`}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -391,16 +416,16 @@ const Sensors: React.FC = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="dark"
+        theme={isDarkMode ? "dark" : "light"}
       />
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
-          <Cpu className="h-8 w-8 text-blue-400" />
+          <Cpu className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
           <div>
-            <h1 className="text-2xl font-bold text-white">Sensors</h1>
-            <p className="text-gray-400">Manage and configure your industrial sensors</p>
+            <h1 className={`text-2xl font-bold ${textClass}`}>Sensors</h1>
+            <p className={textSecondaryClass}>Manage and configure your industrial sensors</p>
           </div>
         </div>
         
@@ -412,7 +437,7 @@ const Sensors: React.FC = () => {
             <input
               type="text"
               placeholder="Search sensors..."
-              className="pl-10 pr-4 py-2 w-full bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`pl-10 pr-4 py-2 w-full ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               value={searchTerm}
               onChange={handleSearch}
             />
@@ -428,7 +453,7 @@ const Sensors: React.FC = () => {
             className={`flex items-center space-x-2 px-4 py-2 border rounded-md transition-colors ${
               showFilters 
                 ? 'bg-blue-600 border-blue-600 text-white' 
-                : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                : `${buttonSecondaryClass}`
             }`}
           >
             <Filter className="h-4 w-4" />
@@ -437,7 +462,7 @@ const Sensors: React.FC = () => {
           
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+            className={`flex items-center space-x-2 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md transition-colors whitespace-nowrap`}
           >
             <Plus className="h-5 w-5" />
             <span>New Sensor</span>
@@ -447,14 +472,14 @@ const Sensors: React.FC = () => {
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className={`rounded-lg border p-4 ${cardBgClass} ${cardBorderClass}`}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Department</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Department</label>
               <select
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Departments</option>
                 {departments.map(dept => (
@@ -464,11 +489,11 @@ const Sensors: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Status</option>
                 <option value="true">Active</option>
@@ -477,11 +502,11 @@ const Sensors: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Sensor Type</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Sensor Type</label>
               <select
                 value={sensorTypeFilter}
                 onChange={(e) => setSensorTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Types</option>
                 <option value="power">Power</option>
@@ -493,12 +518,12 @@ const Sensors: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Sort By</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Sort By</label>
               <div className="flex space-x-2">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`flex-1 px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="name">Name</option>
                   <option value="createdAt">Created Date</option>
@@ -506,7 +531,7 @@ const Sensors: React.FC = () => {
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="asc">↑</option>
                   <option value="desc">↓</option>
@@ -518,7 +543,7 @@ const Sensors: React.FC = () => {
           <div className="flex justify-end mt-4">
             <button
               onClick={clearFilters}
-              className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+              className={`px-4 py-2 ${textSecondaryClass} hover:${textClass} text-sm`}
             >
               Clear Filters
             </button>
@@ -529,37 +554,37 @@ const Sensors: React.FC = () => {
       {/* Stats */}
       {pagination && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Total Sensors</p>
-                <p className="text-xl font-semibold text-white">{pagination.totalSensors}</p>
+                <p className={`text-sm ${textSecondaryClass}`}>Total Sensors</p>
+                <p className={`text-xl font-semibold ${textClass}`}>{pagination.totalSensors}</p>
               </div>
-              <Cpu className="h-8 w-8 text-blue-400" />
+              <Cpu className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
             </div>
           </div>
 
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Current Page</p>
-                <p className="text-xl font-semibold text-green-400">
+                <p className={`text-sm ${textSecondaryClass}`}>Current Page</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                   {pagination.currentPage} of {pagination.totalPages}
                 </p>
               </div>
-              <Power className="h-8 w-8 text-green-400" />
+              <Power className={`h-8 w-8 ${isDarkMode ? 'text-green-400' : 'text-green-500'}`} />
             </div>
           </div>
 
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Showing</p>
-                <p className="text-xl font-semibold text-yellow-400">
+                <p className={`text-sm ${textSecondaryClass}`}>Showing</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
                   {sensors.length} sensors
                 </p>
               </div>
-              <Cpu className="h-8 w-8 text-yellow-400" />
+              <Cpu className={`h-8 w-8 ${isDarkMode ? 'text-yellow-400' : 'text-amber-500'}`} />
             </div>
           </div>
         </div>
@@ -568,15 +593,15 @@ const Sensors: React.FC = () => {
       {/* Sensor Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
-            <div className="p-6 border-b border-gray-700">
+          <div className={`rounded-lg border w-full max-w-md ${cardBgClass} ${cardBorderClass}`}>
+            <div className={`p-6 border-b ${cardBorderClass}`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className={`text-lg font-semibold ${textClass}`}>
                   {editingSensor ? 'Edit Sensor' : 'Create New Sensor'}
                 </h3>
                 <button 
                   onClick={resetForm}
-                  className="text-gray-400 hover:text-white"
+                  className={textSecondaryClass}
                 >
                   &times;
                 </button>
@@ -585,7 +610,7 @@ const Sensors: React.FC = () => {
             
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Sensor Name *
                 </label>
                 <input
@@ -593,33 +618,33 @@ const Sensors: React.FC = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="Enter sensor name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Description
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="Enter sensor description"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Sensor Type *
                 </label>
                 <select
                   required
                   value={formData.sensorType}
                   onChange={(e) => setFormData({ ...formData, sensorType: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="power">Power Sensor</option>
                   <option value="unit-cycle">Unit Cycle Sensor</option>
@@ -627,14 +652,14 @@ const Sensors: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Department *
                 </label>
                 <select
                   required
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="">Select department</option>
                   {departments.map((dept) => (
@@ -646,14 +671,14 @@ const Sensors: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Machine *
                 </label>
                 <select
                   required
                   value={formData.machineId}
                   onChange={(e) => setFormData({ ...formData, machineId: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   disabled={!departmentFilter}
                 >
                   <option value="">Select machine</option>
@@ -668,7 +693,7 @@ const Sensors: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Active Status
                 </label>
                 <div className="flex items-center">
@@ -680,7 +705,7 @@ const Sensors: React.FC = () => {
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    <span className="ml-3 text-sm text-gray-300">
+                    <span className={`ml-3 text-sm ${textSecondaryClass}`}>
                       {formData.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </label>
@@ -691,13 +716,13 @@ const Sensors: React.FC = () => {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+                  className={`px-4 py-2 border ${buttonSecondaryClass} rounded-md`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className={`px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                 >
                   {editingSensor ? 'Update Sensor' : 'Create Sensor'}
                 </button>
@@ -708,32 +733,32 @@ const Sensors: React.FC = () => {
       )}
 
       {/* Sensors Table */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+      <div className={`rounded-lg border overflow-hidden ${cardBgClass} ${cardBorderClass}`}>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-700">
-            <thead className="bg-gray-750">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className={tableHeaderClass}>
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Sensor
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Machine
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Department
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Type
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Status
                 </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-right text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-gray-800 divide-y divide-gray-700">
+            <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center">
@@ -750,7 +775,7 @@ const Sensors: React.FC = () => {
                   return (
                     <tr 
                       key={sensor._id} 
-                      className={`hover:bg-gray-750 ${!sensor.isActive ? 'opacity-70' : ''}`}
+                      className={`${tableRowHoverClass} ${!sensor.isActive ? 'opacity-70' : ''}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -758,23 +783,23 @@ const Sensors: React.FC = () => {
                             {getSensorIcon(sensor.sensorType)}
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-white">
+                            <div className={`text-sm font-medium ${textClass}`}>
                               {sensor.name}
                             </div>
-                            <div className="text-xs text-gray-400 truncate max-w-xs">
+                            <div className={`text-xs ${textSecondaryClass} truncate max-w-xs`}>
                               {sensor.description || 'No description'}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-300">
+                        <div className={`text-sm ${textClass}`}>
                           {machine?.name || 'Unknown'}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-300 flex items-center">
-                          <Building2 className="h-4 w-4 mr-1 text-gray-400" />
+                        <div className={`text-sm ${textClass} flex items-center`}>
+                          <Building2 className={`h-4 w-4 mr-1 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
                           {department?.name || 'Unknown'}
                         </div>
                       </td>
@@ -786,8 +811,8 @@ const Sensors: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           sensor.isActive 
-                            ? 'bg-green-900/50 text-green-400' 
-                            : 'bg-red-900/50 text-red-400'
+                            ? isDarkMode ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-800'
+                            : isDarkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-800'
                         }`}>
                           {sensor.isActive ? 'Active' : 'Inactive'}
                         </span>
@@ -796,7 +821,11 @@ const Sensors: React.FC = () => {
                         <div className="flex justify-end space-x-2">
                           <button
                             onClick={() => handleEdit(sensor)}
-                            className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
+                            className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                              isDarkMode 
+                                ? 'text-blue-400 hover:text-blue-300' 
+                                : 'text-blue-600 hover:text-blue-800'
+                            }`}
                             title="Edit"
                           >
                             <Edit className="h-4 w-4" />
@@ -804,11 +833,17 @@ const Sensors: React.FC = () => {
                           <button
                             onClick={() => handleToggleStatus(sensor._id, sensor.isActive)}
                             disabled={statusTogglingId === sensor._id}
-                            className={`p-1 rounded-md hover:bg-gray-700 ${
+                            className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                              statusTogglingId === sensor._id ? 'opacity-50' : ''
+                            } ${
                               sensor.isActive 
-                                ? 'text-yellow-400 hover:text-yellow-300' 
-                                : 'text-green-400 hover:text-green-300'
-                            } ${statusTogglingId === sensor._id ? 'opacity-50' : ''}`}
+                                ? isDarkMode 
+                                  ? 'text-yellow-400 hover:text-yellow-300' 
+                                  : 'text-amber-600 hover:text-amber-800'
+                                : isDarkMode 
+                                  ? 'text-green-400 hover:text-green-300' 
+                                  : 'text-green-600 hover:text-green-800'
+                            }`}
                             title={sensor.isActive ? 'Deactivate' : 'Activate'}
                           >
                             {statusTogglingId === sensor._id ? (
@@ -822,8 +857,12 @@ const Sensors: React.FC = () => {
                           <button
                             onClick={() => handleDelete(sensor._id)}
                             disabled={deletingId === sensor._id}
-                            className={`text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700 ${
+                            className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
                               deletingId === sensor._id ? 'opacity-50' : ''
+                            } ${
+                              isDarkMode 
+                                ? 'text-red-400 hover:text-red-300' 
+                                : 'text-red-600 hover:text-red-800'
                             }`}
                             title="Delete"
                           >
@@ -842,16 +881,16 @@ const Sensors: React.FC = () => {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <Cpu className="h-12 w-12 text-gray-600 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-400 mb-2">No sensors found</h3>
-                      <p className="text-gray-500 max-w-md">
+                      <Cpu className={`h-12 w-12 ${textSecondaryClass} mb-4`} />
+                      <h3 className={`text-lg font-medium ${textSecondaryClass} mb-2`}>No sensors found</h3>
+                      <p className={textSecondaryClass}>
                         {searchTerm || departmentFilter || statusFilter !== '' || sensorTypeFilter !== ''
                           ? 'No sensors match your current filters' 
                           : 'Get started by creating your first sensor'}
                       </p>
                       <button 
                         onClick={() => setShowForm(true)}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        className={`mt-4 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                       >
                         Create Sensor
                       </button>

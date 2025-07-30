@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Department, Machine, MachineStats, MachineStatus } from '../types';
 import apiService from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import socketService from '../services/socket';
+import { ThemeContext } from '../App';
 
 import {
   ArrowLeft,
@@ -25,6 +26,7 @@ const DepartmentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
+  const { isDarkMode } = useContext(ThemeContext);
   const [department, setDepartment] = useState<Department | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,21 @@ const DepartmentView: React.FC = () => {
   const dragOffset = useRef({ x: 0, y: 0 });
   const machinesRef = useRef<Machine[]>([]);
   machinesRef.current = machines;
+
+  // Theme classes
+  const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const cardBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const cardBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textSecondaryClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-white';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+  const buttonPrimaryClass = isDarkMode 
+    ? 'bg-blue-600 hover:bg-blue-700' 
+    : 'bg-blue-600 hover:bg-blue-500';
+  const buttonSecondaryClass = isDarkMode 
+    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+    : 'border-gray-300 text-gray-700 hover:bg-gray-100';
 
   // Calculate department stats from machine data
   const departmentStats = useMemo(() => {
@@ -342,7 +359,7 @@ const DepartmentView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className={`flex items-center justify-center h-64 ${bgClass}`}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -350,14 +367,14 @@ const DepartmentView: React.FC = () => {
 
   if (!department) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-400">Department not found</p>
+      <div className={`text-center py-12 ${bgClass}`}>
+        <p className={textSecondaryClass}>Department not found</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 p-4 min-h-screen ${bgClass}`}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -368,7 +385,7 @@ const DepartmentView: React.FC = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="dark"
+        theme={isDarkMode ? "dark" : "light"}
       />
       
       {/* Header */}
@@ -376,13 +393,13 @@ const DepartmentView: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => navigate('/dashboard')}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+            className={`p-2 ${textSecondaryClass} hover:${textClass} hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-md transition-colors`}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-white">{department.name}</h1>
-            <p className="text-gray-400">{department.description}</p>
+            <h1 className={`text-2xl font-bold ${textClass}`}>{department.name}</h1>
+            <p className={textSecondaryClass}>{department.description}</p>
           </div>
         </div>
         
@@ -390,14 +407,14 @@ const DepartmentView: React.FC = () => {
           <div className="flex items-center space-x-2">
             <button 
               onClick={() => setIsAddingMachine(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              className={`flex items-center space-x-2 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md transition-colors`}
             >
               <Plus className="h-4 w-4" />
               <span>Add Machine</span>
             </button>
             <button 
               onClick={() => setEditLayoutMode(!editLayoutMode)}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+              className={`p-2 ${textSecondaryClass} hover:${textClass} hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-md transition-colors`}
             >
               {editLayoutMode ? <Save className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
             </button>
@@ -407,56 +424,56 @@ const DepartmentView: React.FC = () => {
 
       {/* Department Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+        <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Total Machines</p>
-              <p className="text-xl font-semibold text-white">{machines.length}</p>
+              <p className={`text-sm ${textSecondaryClass}`}>Total Machines</p>
+              <p className={`text-xl font-semibold ${textClass}`}>{machines.length}</p>
             </div>
-            <Activity className="h-8 w-8 text-blue-400" />
+            <Activity className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
           </div>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+        <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Running</p>
-              <p className="text-xl font-semibold text-green-400">{departmentStats.runningMachines}</p>
+              <p className={`text-sm ${textSecondaryClass}`}>Running</p>
+              <p className={`text-xl font-semibold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>{departmentStats.runningMachines}</p>
             </div>
-            <Power className="h-8 w-8 text-green-400" />
+            <Power className={`h-8 w-8 ${isDarkMode ? 'text-green-400' : 'text-green-500'}`} />
           </div>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+        <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Stopped</p>
-              <p className="text-xl font-semibold text-red-400">{departmentStats.stoppedMachines}</p>
+              <p className={`text-sm ${textSecondaryClass}`}>Stopped</p>
+              <p className={`text-xl font-semibold ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{departmentStats.stoppedMachines}</p>
             </div>
-            <AlertTriangle className="h-8 w-8 text-red-400" />
+            <AlertTriangle className={`h-8 w-8 ${isDarkMode ? 'text-red-400' : 'text-red-500'}`} />
           </div>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+        <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Department OEE</p>
-              <p className="text-xl font-semibold text-yellow-400">{departmentStats.avgOEE}%</p>
+              <p className={`text-sm ${textSecondaryClass}`}>Department OEE</p>
+              <p className={`text-xl font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>{departmentStats.avgOEE}%</p>
             </div>
-            <Gauge className="h-8 w-8 text-yellow-400" />
+            <Gauge className={`h-8 w-8 ${isDarkMode ? 'text-yellow-400' : 'text-amber-500'}`} />
           </div>
         </div>
       </div>
 
       {/* Machine Layout */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className={`rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
+        <div className={`p-6 border-b ${cardBorderClass}`}>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Machine Layout</h2>
+            <h2 className={`text-lg font-semibold ${textClass}`}>Machine Layout</h2>
             {isAdmin && (
               <button 
                 onClick={() => setEditLayoutMode(!editLayoutMode)}
-                className="text-blue-400 hover:text-blue-300 text-sm flex items-center space-x-1"
+                className={`${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'} text-sm flex items-center space-x-1`}
               >
                 <Edit className="h-4 w-4" />
                 <span>{editLayoutMode ? 'Save Layout' : 'Edit Layout'}</span>
@@ -469,7 +486,9 @@ const DepartmentView: React.FC = () => {
           {machines.length > 0 ? (
             <div 
               ref={layoutContainerRef}
-              className="relative w-full min-h-[700px] bg-gray-900/50 rounded-lg border border-dashed border-gray-700"
+              className={`relative w-full min-h-[700px] ${
+                isDarkMode ? 'bg-gray-900/50' : 'bg-gray-100'
+              } rounded-lg border border-dashed ${cardBorderClass}`}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
@@ -478,11 +497,13 @@ const DepartmentView: React.FC = () => {
                 <div
                   key={machine._id}
                   onClick={() => handleMachineClick(machine._id)}
-                  className={`absolute bg-gray-700 rounded-lg p-4 border ${
+                  className={`absolute rounded-lg p-4 border ${
                     editLayoutMode 
-                      ? 'border-blue-500 cursor-move' 
-                      : 'border-gray-600 hover:border-blue-500'
-                  } transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
+                      ? `${isDarkMode ? 'border-blue-500' : 'border-blue-600'} cursor-move` 
+                      : `${cardBorderClass} ${isDarkMode ? 'hover:border-blue-500' : 'hover:border-blue-600'}`
+                  } transition-all duration-200 ${
+                    isDarkMode ? 'hover:shadow-lg hover:shadow-blue-500/10' : 'hover:shadow-md hover:shadow-blue-500/20'
+                  }`}
                   style={{
                     left: `${positions[machine._id]?.x || 0}px`,
                     top: `${positions[machine._id]?.y || 0}px`,
@@ -491,18 +512,23 @@ const DepartmentView: React.FC = () => {
                     cursor: editLayoutMode ? 'move' : 'pointer',
                     transform: draggingMachineId === machine._id ? 'scale(1.02)' : 'none',
                     transition: draggingMachineId === machine._id ? 'none' : 'all 0.2s ease',
-                    boxShadow: draggingMachineId === machine._id ? '0 10px 25px rgba(0, 0, 0, 0.3)' : 'none'
+                    boxShadow: draggingMachineId === machine._id 
+                      ? isDarkMode 
+                        ? '0 10px 25px rgba(0, 0, 0, 0.3)' 
+                        : '0 10px 15px rgba(0, 0, 0, 0.1)'
+                      : 'none',
+                    backgroundColor: isDarkMode ? '#1f2937' : '#f9fafb'
                   }}
                   onMouseDown={(e) => handleMouseDown(machine._id, e)}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium text-white truncate">{machine.name}</h3>
+                    <h3 className={`font-medium ${textClass} truncate`}>{machine.name}</h3>
                     <div className="flex items-center space-x-2">
                       <div className={`h-3 w-3 rounded-full ${getStatusColor(machineStatuses[machine._id] as MachineStatus || machine.status as MachineStatus)}`}></div>
                       {editLayoutMode && (
                         <button
                           onClick={(e) => handleDeleteMachine(machine._id, e)}
-                          className="text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700"
+                          className={`p-1 rounded-md ${isDarkMode ? 'text-red-400 hover:text-red-300 hover:bg-gray-700' : 'text-red-600 hover:text-red-800 hover:bg-gray-100'}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -510,36 +536,36 @@ const DepartmentView: React.FC = () => {
                     </div>
                   </div>
                   
-                  <p className="text-sm text-gray-400 mb-3 line-clamp-2">
+                  <p className={`text-sm ${textSecondaryClass} mb-3 line-clamp-2`}>
                     {machine.description || 'No description'}
                   </p>
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">Status</span>
+                      <span className={textSecondaryClass}>Status</span>
                         <span className={`font-medium ${
                           (machineStatuses[machine._id] || machine.status) === 'running' 
-                            ? 'text-green-400' :
+                            ? isDarkMode ? 'text-green-400' : 'text-green-600' :
                           (machineStatuses[machine._id] || machine.status) === 'stoppage' 
-                            ? 'text-red-400' :
+                            ? isDarkMode ? 'text-red-400' : 'text-red-600' :
                           (machineStatuses[machine._id] || machine.status) === 'stopped_yet_producing' 
-                            ? 'text-orange-400' :
-                          'text-gray-400' // inactive
+                            ? isDarkMode ? 'text-orange-400' : 'text-orange-600' :
+                          textSecondaryClass // inactive
                         }`}>
                         {getStatusText(machineStatuses[machine._id] as MachineStatus || machine.status as MachineStatus)}
                       </span>
                     </div>
                     
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">OEE</span>
-                      <span className="text-white font-medium">
+                      <span className={textSecondaryClass}>OEE</span>
+                      <span className={`font-medium ${textClass}`}>
                         {machineStats[machine._id]?.oee ?? 'N/A'}%
                       </span>
                     </div>
 
                    <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Today's Units</span>
-                    <span className="text-white font-medium">
+                    <span className={textSecondaryClass}>Today's Units</span>
+                    <span className={`font-medium ${textClass}`}>
                       {machineStats[machine._id]?.totalUnitsProduced ?? 'N/A'}
                     </span>
                   </div>
@@ -549,15 +575,15 @@ const DepartmentView: React.FC = () => {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Activity className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-400 mb-2">No machines found</h3>
-              <p className="text-gray-500 mb-4">
+              <Activity className={`h-12 w-12 mx-auto mb-4 ${textSecondaryClass}`} />
+              <h3 className={`text-lg font-medium ${textSecondaryClass} mb-2`}>No machines found</h3>
+              <p className={`${textSecondaryClass} mb-4`}>
                 This department doesn't have any machines configured yet.
               </p>
               {isAdmin && (
                 <button 
                   onClick={() => setIsAddingMachine(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  className={`px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                 >
                   Add First Machine
                 </button>
@@ -570,13 +596,13 @@ const DepartmentView: React.FC = () => {
       {/* Add Machine Modal */}
       {isAddingMachine && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
-            <div className="p-6 border-b border-gray-700">
+          <div className={`rounded-lg border w-full max-w-md ${cardBgClass} ${cardBorderClass}`}>
+            <div className={`p-6 border-b ${cardBorderClass}`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Add New Machine</h3>
+                <h3 className={`text-lg font-semibold ${textClass}`}>Add New Machine</h3>
                 <button 
                   onClick={() => setIsAddingMachine(false)}
-                  className="text-gray-400 hover:text-white"
+                  className={textSecondaryClass}
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -585,25 +611,25 @@ const DepartmentView: React.FC = () => {
             
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Machine Name *
                 </label>
                 <input
                   type="text"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={newMachine.name}
                   onChange={(e) => setNewMachine({...newMachine, name: e.target.value})}
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Description
                 </label>
                 <textarea
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={newMachine.description}
                   onChange={(e) => setNewMachine({...newMachine, description: e.target.value})}
                 />
@@ -612,13 +638,13 @@ const DepartmentView: React.FC = () => {
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   onClick={() => setIsAddingMachine(false)}
-                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+                  className={`px-4 py-2 border ${buttonSecondaryClass} rounded-md`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddMachine}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className={`px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                 >
                   Add Machine
                 </button>
@@ -630,8 +656,8 @@ const DepartmentView: React.FC = () => {
 
       {/* Edit Layout Controls */}
       {editLayoutMode && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 flex justify-between items-center">
-          <div className="text-yellow-400">
+        <div className={`rounded-lg border p-4 flex justify-between items-center ${cardBgClass} ${cardBorderClass}`}>
+          <div className={`${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
             <p className="flex items-center">
               <Edit className="h-4 w-4 mr-2" />
               <span>Layout Edit Mode: Drag machines to reposition, click trash icon to delete</span>
@@ -640,13 +666,13 @@ const DepartmentView: React.FC = () => {
           <div className="flex space-x-2">
             <button
               onClick={() => setEditLayoutMode(false)}
-              className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+              className={`px-4 py-2 border ${buttonSecondaryClass} rounded-md`}
             >
               Cancel
             </button>
             <button
               onClick={handleSaveLayout}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+              className={`px-4 py-2 ${isDarkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600 hover:bg-green-500'} text-white rounded-md flex items-center`}
             >
               <Save className="h-4 w-4 mr-2" />
               Save Layout

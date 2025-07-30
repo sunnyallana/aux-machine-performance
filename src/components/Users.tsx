@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiService from '../services/api';
 import {
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { ThemeContext } from '../App';
 
 interface PaginationData {
   currentPage: number;
@@ -47,6 +48,7 @@ interface UsersResponse {
 
 const Users: React.FC = () => {
   const { isAdmin } = useAuth();
+  const { isDarkMode } = useContext(ThemeContext);
   const [usersData, setUsersData] = useState<UsersResponse | null>(null);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +83,23 @@ const Users: React.FC = () => {
   // Debounced search
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  // Theme classes
+  const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const cardBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const cardBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textSecondaryClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-white';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+  const tableHeaderClass = isDarkMode ? 'bg-gray-750' : 'bg-gray-50';
+  const tableRowHoverClass = isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50';
+  const buttonPrimaryClass = isDarkMode 
+    ? 'bg-blue-600 hover:bg-blue-700' 
+    : 'bg-blue-600 hover:bg-blue-700';
+  const buttonSecondaryClass = isDarkMode 
+    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+    : 'border-gray-300 text-gray-700 hover:bg-gray-50';
+
   const fetchUsers = useCallback(async (page = 1, search = '', role = '', department = '', isActive = '') => {
     try {
       setLoading(true);
@@ -110,7 +129,7 @@ const Users: React.FC = () => {
 
   const fetchDepartments = async () => {
     try {
-      const departmentsData = await apiService.getAllDepartments();
+      const departmentsData = await apiService.getDepartments();
       setDepartments(departmentsData);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch departments';
@@ -360,9 +379,15 @@ const Users: React.FC = () => {
       return pages;
     };
 
+    const paginationBgClass = isDarkMode ? 'bg-gray-800' : 'bg-gray-50';
+    const paginationBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+    const paginationTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+    const paginationButtonClass = isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-700';
+    const paginationHoverClass = isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100';
+
     return (
-      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-t border-gray-700">
-        <div className="flex items-center text-sm text-gray-400">
+      <div className={`flex items-center justify-between px-6 py-3 ${paginationBgClass} border-t ${paginationBorderClass}`}>
+        <div className={`flex items-center text-sm ${paginationTextClass}`}>
           Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
           {Math.min(pagination.currentPage * pagination.limit, pagination.totalUsers)} of{' '}
           {pagination.totalUsers} results
@@ -372,7 +397,7 @@ const Users: React.FC = () => {
           <select
             value={pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+            className={`px-2 py-1 ${paginationButtonClass} border ${inputBorderClass} rounded text-sm`}
           >
             <option value={5}>5 per page</option>
             <option value={10}>10 per page</option>
@@ -383,7 +408,7 @@ const Users: React.FC = () => {
           <button
             onClick={() => handlePageChange(pagination.currentPage - 1)}
             disabled={!pagination.hasPrevPage}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-2 ${paginationTextClass} hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -395,7 +420,7 @@ const Users: React.FC = () => {
               className={`px-3 py-1 rounded text-sm ${
                 page === pagination.currentPage
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                  : `${paginationButtonClass} ${paginationHoverClass} ${paginationTextClass}`
               }`}
             >
               {page}
@@ -405,7 +430,7 @@ const Users: React.FC = () => {
           <button
             onClick={() => handlePageChange(pagination.currentPage + 1)}
             disabled={!pagination.hasNextPage}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-2 ${paginationTextClass} hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -426,7 +451,7 @@ const Users: React.FC = () => {
   const pagination = usersData?.pagination;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${bgClass} min-h-screen p-4`}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -437,16 +462,16 @@ const Users: React.FC = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="dark"
+        theme={isDarkMode ? "dark" : "light"}
       />
       
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
-          <UsersIcon className="h-8 w-8 text-blue-400" />
+          <UsersIcon className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
           <div>
-            <h1 className="text-2xl font-bold text-white">User Management</h1>
-            <p className="text-gray-400">Manage system users and their permissions</p>
+            <h1 className={`text-2xl font-bold ${textClass}`}>User Management</h1>
+            <p className={textSecondaryClass}>Manage system users and their permissions</p>
           </div>
         </div>
         
@@ -458,7 +483,7 @@ const Users: React.FC = () => {
             <input
               type="text"
               placeholder="Search users..."
-              className="pl-10 pr-4 py-2 w-full bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`pl-10 pr-4 py-2 w-full ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -474,7 +499,7 @@ const Users: React.FC = () => {
             className={`flex items-center space-x-2 px-4 py-2 border rounded-md transition-colors ${
               showFilters 
                 ? 'bg-blue-600 border-blue-600 text-white' 
-                : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                : `${buttonSecondaryClass}`
             }`}
           >
             <Filter className="h-4 w-4" />
@@ -484,7 +509,7 @@ const Users: React.FC = () => {
           {isAdmin && (
             <button 
               onClick={() => setIsCreating(true)}
-              className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+              className={`flex items-center justify-center space-x-2 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md transition-colors whitespace-nowrap`}
             >
               <Plus className="h-5 w-5" />
               <span>New User</span>
@@ -495,14 +520,14 @@ const Users: React.FC = () => {
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className={`rounded-lg border p-4 ${cardBgClass} ${cardBorderClass}`}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Role</label>
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Roles</option>
                 <option value="admin">Admin</option>
@@ -511,11 +536,11 @@ const Users: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Department</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Department</label>
               <select
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Departments</option>
                 {departments.map(dept => (
@@ -525,11 +550,11 @@ const Users: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Status</option>
                 <option value="true">Active</option>
@@ -538,12 +563,12 @@ const Users: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Sort By</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Sort By</label>
               <div className="flex space-x-2">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`flex-1 px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="createdAt">Created Date</option>
                   <option value="username">Username</option>
@@ -553,7 +578,7 @@ const Users: React.FC = () => {
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="desc">↓</option>
                   <option value="asc">↑</option>
@@ -565,7 +590,7 @@ const Users: React.FC = () => {
           <div className="flex justify-end mt-4">
             <button
               onClick={clearFilters}
-              className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+              className={`px-4 py-2 ${textSecondaryClass} hover:${textClass} text-sm`}
             >
               Clear Filters
             </button>
@@ -576,37 +601,37 @@ const Users: React.FC = () => {
       {/* Stats */}
       {pagination && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Total Users</p>
-                <p className="text-xl font-semibold text-white">{pagination.totalUsers}</p>
+                <p className={`text-sm ${textSecondaryClass}`}>Total Users</p>
+                <p className={`text-xl font-semibold ${textClass}`}>{pagination.totalUsers}</p>
               </div>
-              <UserIcon className="h-8 w-8 text-blue-400" />
+              <UserIcon className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
             </div>
           </div>
 
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Current Page</p>
-                <p className="text-xl font-semibold text-green-400">
+                <p className={`text-sm ${textSecondaryClass}`}>Current Page</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                   {pagination.currentPage} of {pagination.totalPages}
                 </p>
               </div>
-              <Power className="h-8 w-8 text-green-400" />
+              <Power className={`h-8 w-8 ${isDarkMode ? 'text-green-400' : 'text-green-500'}`} />
             </div>
           </div>
 
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Showing</p>
-                <p className="text-xl font-semibold text-yellow-400">
+                <p className={`text-sm ${textSecondaryClass}`}>Showing</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
                   {users.length} users
                 </p>
               </div>
-              <UsersIcon className="h-8 w-8 text-yellow-400" />
+              <UsersIcon className={`h-8 w-8 ${isDarkMode ? 'text-yellow-400' : 'text-amber-500'}`} />
             </div>
           </div>
         </div>
@@ -615,13 +640,13 @@ const Users: React.FC = () => {
       {/* Create User Modal */}
       {isCreating && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
-            <div className="p-6 border-b border-gray-700">
+          <div className={`rounded-lg border w-full max-w-md ${cardBgClass} ${cardBorderClass}`}>
+            <div className={`p-6 border-b ${cardBorderClass}`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Create New User</h3>
+                <h3 className={`text-lg font-semibold ${textClass}`}>Create New User</h3>
                 <button 
                   onClick={() => setIsCreating(false)}
-                  className="text-gray-400 hover:text-white"
+                  className={textSecondaryClass}
                 >
                   &times;
                 </button>
@@ -630,7 +655,7 @@ const Users: React.FC = () => {
             
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="username" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Username *
                 </label>
                 <input
@@ -638,14 +663,14 @@ const Users: React.FC = () => {
                   id="username"
                   name="username"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={formData.username}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="email" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Email *
                 </label>
                 <input
@@ -653,14 +678,14 @@ const Users: React.FC = () => {
                   id="email"
                   name="email"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={formData.email}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="password" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Password *
                 </label>
                 <div className="relative">
@@ -669,7 +694,7 @@ const Users: React.FC = () => {
                     id="password"
                     name="password"
                     required
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     value={formData.password}
                     onChange={handleInputChange}
                   />
@@ -688,14 +713,14 @@ const Users: React.FC = () => {
               </div>
               
               <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="role" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Role *
                 </label>
                 <select
                   id="role"
                   name="role"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={formData.role}
                   onChange={handleInputChange}
                 >
@@ -706,14 +731,14 @@ const Users: React.FC = () => {
               
               {formData.role === 'operator' && (
                 <div>
-                  <label htmlFor="departmentId" className="block text-sm font-medium text-gray-300 mb-1">
+                  <label htmlFor="departmentId" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                     Department *
                   </label>
                   <select
                     id="departmentId"
                     name="departmentId"
                     required
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     value={formData.departmentId}
                     onChange={handleInputChange}
                   >
@@ -729,13 +754,13 @@ const Users: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCreating(false)}
-                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+                  className={`px-4 py-2 border ${buttonSecondaryClass} rounded-md`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className={`px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                 >
                   Create User
                 </button>
@@ -748,13 +773,13 @@ const Users: React.FC = () => {
       {/* Edit User Modal */}
       {editingUser && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
-            <div className="p-6 border-b border-gray-700">
+          <div className={`rounded-lg border w-full max-w-md ${cardBgClass} ${cardBorderClass}`}>
+            <div className={`p-6 border-b ${cardBorderClass}`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Edit User</h3>
+                <h3 className={`text-lg font-semibold ${textClass}`}>Edit User</h3>
                 <button 
                   onClick={() => setEditingUser(null)}
-                  className="text-gray-400 hover:text-white"
+                  className={textSecondaryClass}
                 >
                   &times;
                 </button>
@@ -763,7 +788,7 @@ const Users: React.FC = () => {
             
             <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
               <div>
-                <label htmlFor="edit-username" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="edit-username" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Username *
                 </label>
                 <input
@@ -771,14 +796,14 @@ const Users: React.FC = () => {
                   id="edit-username"
                   name="username"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={editingUser.username}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="edit-email" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="edit-email" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Email *
                 </label>
                 <input
@@ -786,14 +811,14 @@ const Users: React.FC = () => {
                   id="edit-email"
                   name="email"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={editingUser.email}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="edit-password" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="edit-password" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   New Password
                 </label>
                 <div className="relative">
@@ -801,7 +826,7 @@ const Users: React.FC = () => {
                     type={showEditPassword ? "text" : "password"}
                     id="edit-password"
                     name="password"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     value={editingUser.password || ''}
                     onChange={handleInputChange}
                     placeholder="Leave blank to keep current password"
@@ -818,20 +843,20 @@ const Users: React.FC = () => {
                     )}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className={`text-xs mt-1 ${textSecondaryClass}`}>
                   Only enter a value if you want to change the password
                 </p>
               </div>
               
               <div>
-                <label htmlFor="edit-role" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="edit-role" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Role *
                 </label>
                 <select
                   id="edit-role"
                   name="role"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={editingUser.role}
                   onChange={handleInputChange}
                 >
@@ -842,14 +867,14 @@ const Users: React.FC = () => {
               
               {editingUser.role === 'operator' && (
                 <div>
-                  <label htmlFor="edit-departmentId" className="block text-sm font-medium text-gray-300 mb-1">
+                  <label htmlFor="edit-departmentId" className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                     Department *
                   </label>
                   <select
                     id="edit-departmentId"
                     name="departmentId"
                     required
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     value={editingUser.departmentId || ''}
                     onChange={handleInputChange}
                   >
@@ -865,13 +890,13 @@ const Users: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+                  className={`px-4 py-2 border ${buttonSecondaryClass} rounded-md`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className={`px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                 >
                   Update User
                 </button>
@@ -882,57 +907,63 @@ const Users: React.FC = () => {
       )}
 
       {/* Users Table */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+      <div className={`rounded-lg border overflow-hidden ${cardBgClass} ${cardBorderClass}`}>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-700">
-            <thead className="bg-gray-750">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className={tableHeaderClass}>
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   User
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Role
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Department
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Status
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Created
                 </th>
                 {isAdmin && (
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th scope="col" className={`px-6 py-3 text-right text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                     Actions
                   </th>
                 )}
               </tr>
             </thead>
-            <tbody className="bg-gray-800 divide-y divide-gray-700">
+            <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {users.length > 0 ? (
                 users.map((user) => (
                   <tr 
                     key={user.id} 
-                    className={`hover:bg-gray-750 ${!user.isActive ? 'opacity-70' : ''}`}
+                    className={`${tableRowHoverClass} ${!user.isActive ? 'opacity-70' : ''}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${
-                          user.isActive ? 'bg-blue-500' : 'bg-gray-600'
+                          user.isActive 
+                            ? isDarkMode ? 'bg-blue-500' : 'bg-blue-500' 
+                            : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
                         }`}>
                           <UserIcon className="h-5 w-5 text-white" />
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-white flex items-center">
+                          <div className={`text-sm font-medium flex items-center ${textClass}`}>
                             {user.username}
                             {!user.isActive && (
-                              <span className="ml-2 text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+                              <span className={`ml-2 text-xs px-2 py-0.5 rounded ${
+                                isDarkMode 
+                                  ? 'bg-gray-700 text-gray-300' 
+                                  : 'bg-gray-200 text-gray-700'
+                              }`}>
                                 Inactive
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-gray-400">
+                          <div className={`text-xs ${textSecondaryClass}`}>
                             {user.email}
                           </div>
                         </div>
@@ -941,17 +972,21 @@ const Users: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         user.role === 'admin' 
-                          ? 'bg-purple-900/50 text-purple-400' 
-                          : 'bg-blue-900/50 text-blue-400'
+                          ? isDarkMode 
+                            ? 'bg-purple-900/50 text-purple-400' 
+                            : 'bg-purple-100 text-purple-800'
+                          : isDarkMode 
+                            ? 'bg-blue-900/50 text-blue-400' 
+                            : 'bg-blue-100 text-blue-800'
                       }`}>
                         {user.role}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-300 flex items-center">
+                      <div className={`text-sm flex items-center ${textClass}`}>
                         {user.departmentId ? (
                           <>
-                            <Building2 className="h-4 w-4 mr-1 text-blue-400" />
+                            <Building2 className={`h-4 w-4 mr-1 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
                             {getDepartmentName(user.departmentId)}
                           </>
                         ) : (
@@ -962,13 +997,17 @@ const Users: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         user.isActive 
-                          ? 'bg-green-900/50 text-green-400' 
-                          : 'bg-red-900/50 text-red-400'
+                          ? isDarkMode 
+                            ? 'bg-green-900/50 text-green-400' 
+                            : 'bg-green-100 text-green-800'
+                          : isDarkMode 
+                            ? 'bg-red-900/50 text-red-400' 
+                            : 'bg-red-100 text-red-800'
                       }`}>
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${textSecondaryClass}`}>
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                     {isAdmin && (
@@ -988,7 +1027,11 @@ const Users: React.FC = () => {
                                 password: ''
                               });
                             }}
-                            className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
+                            className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                              isDarkMode 
+                                ? 'text-blue-400 hover:text-blue-300' 
+                                : 'text-blue-600 hover:text-blue-800'
+                            }`}
                             title="Edit"
                           >
                             <Edit className="h-4 w-4" />
@@ -999,11 +1042,17 @@ const Users: React.FC = () => {
                               handleToggleStatus(user.id, user.isActive);
                             }}
                             disabled={statusTogglingId === user.id}
-                            className={`p-1 rounded-md hover:bg-gray-700 ${
+                            className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                              statusTogglingId === user.id ? 'opacity-50' : ''
+                            } ${
                               user.isActive 
-                                ? 'text-yellow-400 hover:text-yellow-300' 
-                                : 'text-green-400 hover:text-green-300'
-                            } ${statusTogglingId === user.id ? 'opacity-50' : ''}`}
+                                ? isDarkMode 
+                                  ? 'text-yellow-400 hover:text-yellow-300' 
+                                  : 'text-amber-600 hover:text-amber-800'
+                                : isDarkMode 
+                                  ? 'text-green-400 hover:text-green-300' 
+                                  : 'text-green-600 hover:text-green-800'
+                            }`}
                             title={user.isActive ? 'Deactivate' : 'Activate'}
                           >
                             {statusTogglingId === user.id ? (
@@ -1020,8 +1069,12 @@ const Users: React.FC = () => {
                               handleDeleteUser(user.id);
                             }}
                             disabled={deletingId === user.id}
-                            className={`text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700 ${
+                            className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
                               deletingId === user.id ? 'opacity-50' : ''
+                            } ${
+                              isDarkMode 
+                                ? 'text-red-400 hover:text-red-300' 
+                                : 'text-red-600 hover:text-red-800'
                             }`}
                             title="Delete permanently"
                           >
@@ -1040,9 +1093,9 @@ const Users: React.FC = () => {
                 <tr>
                   <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <UserIcon className="h-12 w-12 text-gray-600 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-400 mb-2">No users found</h3>
-                      <p className="text-gray-500 max-w-md">
+                      <UserIcon className={`h-12 w-12 ${textSecondaryClass} mb-4`} />
+                      <h3 className={`text-lg font-medium mb-2 ${textSecondaryClass}`}>No users found</h3>
+                      <p className={textSecondaryClass}>
                         {searchTerm || roleFilter || departmentFilter || statusFilter !== ''
                           ? 'No users match your current filters' 
                           : 'Get started by creating your first user'}
@@ -1050,7 +1103,7 @@ const Users: React.FC = () => {
                       {isAdmin && !searchTerm && !roleFilter && !departmentFilter && statusFilter === '' && (
                         <button 
                           onClick={() => setIsCreating(true)}
-                          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                          className={`mt-4 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                         >
                           Create User
                         </button>

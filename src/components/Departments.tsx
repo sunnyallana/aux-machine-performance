@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Department } from '../types';
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { ThemeContext } from '../App';
 
 interface PaginationData {
   currentPage: number;
@@ -43,6 +44,7 @@ interface DepartmentsResponse {
 
 const Departments: React.FC = () => {
   const { isAdmin } = useAuth();
+  const { isDarkMode } = useContext(ThemeContext);
   const navigate = useNavigate();
   
   // Pagination and filtering states
@@ -70,6 +72,23 @@ const Departments: React.FC = () => {
   
   // Debounced search
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Theme classes
+  const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const cardBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const cardBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textSecondaryClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-white';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+  const tableHeaderClass = isDarkMode ? 'bg-gray-750' : 'bg-gray-50';
+  const tableRowHoverClass = isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50';
+  const buttonPrimaryClass = isDarkMode 
+    ? 'bg-blue-600 hover:bg-blue-700' 
+    : 'bg-blue-600 hover:bg-blue-700';
+  const buttonSecondaryClass = isDarkMode 
+    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+    : 'border-gray-300 text-gray-700 hover:bg-gray-50';
 
   const fetchData = useCallback(async (page = 1, search = '', isActive = '') => {
     try {
@@ -237,9 +256,15 @@ const Departments: React.FC = () => {
       return pages;
     };
 
+    const paginationBgClass = isDarkMode ? 'bg-gray-800' : 'bg-gray-50';
+    const paginationBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+    const paginationTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+    const paginationButtonClass = isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-700';
+    const paginationHoverClass = isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100';
+
     return (
-      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-t border-gray-700">
-        <div className="flex items-center text-sm text-gray-400">
+      <div className={`flex items-center justify-between px-6 py-3 ${paginationBgClass} border-t ${paginationBorderClass}`}>
+        <div className={`flex items-center text-sm ${paginationTextClass}`}>
           Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
           {Math.min(pagination.currentPage * pagination.limit, pagination.totalDepartments)} of{' '}
           {pagination.totalDepartments} results
@@ -249,7 +274,7 @@ const Departments: React.FC = () => {
           <select
             value={pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+            className={`px-2 py-1 ${paginationButtonClass} border ${inputBorderClass} rounded text-sm`}
           >
             <option value={5}>5 per page</option>
             <option value={10}>10 per page</option>
@@ -260,7 +285,7 @@ const Departments: React.FC = () => {
           <button
             onClick={() => handlePageChange(pagination.currentPage - 1)}
             disabled={!pagination.hasPrevPage}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-2 ${paginationTextClass} hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -272,7 +297,7 @@ const Departments: React.FC = () => {
               className={`px-3 py-1 rounded text-sm ${
                 page === pagination.currentPage
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                  : `${paginationButtonClass} ${paginationHoverClass} ${paginationTextClass}`
               }`}
             >
               {page}
@@ -282,7 +307,7 @@ const Departments: React.FC = () => {
           <button
             onClick={() => handlePageChange(pagination.currentPage + 1)}
             disabled={!pagination.hasNextPage}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-2 ${paginationTextClass} hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -291,16 +316,26 @@ const Departments: React.FC = () => {
     );
   };
 
+  if (!isAdmin) {
+    return (
+      <div className={`${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800'} border ${isDarkMode ? 'border-red-500' : 'border-red-300'} px-4 py-3 rounded-md`}>
+        <div className="flex items-center">
+          <div className="h-4 w-4 mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <span>Access denied. Admin privileges required.</span>
+        </div>
+      </div>
+    );
+  }
+
   const departments = departmentsData?.departments || [];
   const pagination = departmentsData?.pagination;
 
-  if (!isAdmin) {
-    // Non-admin view remains the same as before
-    // ... (existing non-admin implementation)
-  }
-
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${bgClass} min-h-screen p-4`}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -311,16 +346,16 @@ const Departments: React.FC = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="dark"
+        theme={isDarkMode ? "dark" : "light"}
       />
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
-          <Building2 className="h-8 w-8 text-blue-400" />
+          <Building2 className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
           <div>
-            <h1 className="text-2xl font-bold text-white">Departments</h1>
-            <p className="text-gray-400">Manage and configure your industrial departments</p>
+            <h1 className={`text-2xl font-bold ${textClass}`}>Departments</h1>
+            <p className={textSecondaryClass}>Manage and configure your industrial departments</p>
           </div>
         </div>
         
@@ -332,7 +367,7 @@ const Departments: React.FC = () => {
             <input
               type="text"
               placeholder="Search departments..."
-              className="pl-10 pr-4 py-2 w-full bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`pl-10 pr-4 py-2 w-full ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -348,7 +383,7 @@ const Departments: React.FC = () => {
             className={`flex items-center space-x-2 px-4 py-2 border rounded-md transition-colors ${
               showFilters 
                 ? 'bg-blue-600 border-blue-600 text-white' 
-                : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                : `${buttonSecondaryClass}`
             }`}
           >
             <Filter className="h-4 w-4" />
@@ -357,7 +392,7 @@ const Departments: React.FC = () => {
           
           <button
             onClick={() => setIsCreating(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+            className={`flex items-center space-x-2 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md transition-colors whitespace-nowrap`}
           >
             <Plus className="h-5 w-5" />
             <span>New Department</span>
@@ -367,14 +402,14 @@ const Departments: React.FC = () => {
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className={`rounded-lg border p-4 ${cardBgClass} ${cardBorderClass}`}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               >
                 <option value="">All Status</option>
                 <option value="true">Active</option>
@@ -383,12 +418,12 @@ const Departments: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Sort By</label>
+              <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>Sort By</label>
               <div className="flex space-x-2">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`flex-1 px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="name">Name</option>
                   <option value="createdAt">Created Date</option>
@@ -397,7 +432,7 @@ const Departments: React.FC = () => {
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="asc">↑</option>
                   <option value="desc">↓</option>
@@ -409,7 +444,7 @@ const Departments: React.FC = () => {
           <div className="flex justify-end mt-4">
             <button
               onClick={clearFilters}
-              className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+              className={`px-4 py-2 ${textSecondaryClass} hover:${textClass} text-sm`}
             >
               Clear Filters
             </button>
@@ -420,37 +455,37 @@ const Departments: React.FC = () => {
       {/* Stats */}
       {pagination && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Total Departments</p>
-                <p className="text-xl font-semibold text-white">{pagination.totalDepartments}</p>
+                <p className={`text-sm ${textSecondaryClass}`}>Total Departments</p>
+                <p className={`text-xl font-semibold ${textClass}`}>{pagination.totalDepartments}</p>
               </div>
-              <Building2 className="h-8 w-8 text-blue-400" />
+              <Building2 className={`h-8 w-8 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
             </div>
           </div>
 
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Current Page</p>
-                <p className="text-xl font-semibold text-green-400">
+                <p className={`text-sm ${textSecondaryClass}`}>Current Page</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                   {pagination.currentPage} of {pagination.totalPages}
                 </p>
               </div>
-              <Power className="h-8 w-8 text-green-400" />
+              <Power className={`h-8 w-8 ${isDarkMode ? 'text-green-400' : 'text-green-500'}`} />
             </div>
           </div>
 
-          <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div className={`p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Showing</p>
-                <p className="text-xl font-semibold text-yellow-400">
+                <p className={`text-sm ${textSecondaryClass}`}>Showing</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
                   {departments.length} departments
                 </p>
               </div>
-              <Building2 className="h-8 w-8 text-yellow-400" />
+              <Building2 className={`h-8 w-8 ${isDarkMode ? 'text-yellow-400' : 'text-amber-500'}`} />
             </div>
           </div>
         </div>
@@ -459,13 +494,13 @@ const Departments: React.FC = () => {
       {/* Create Department Modal */}
       {isCreating && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
-            <div className="p-6 border-b border-gray-700">
+          <div className={`rounded-lg border w-full max-w-md ${cardBgClass} ${cardBorderClass}`}>
+            <div className={`p-6 border-b ${cardBorderClass}`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Create New Department</h3>
+                <h3 className={`text-lg font-semibold ${textClass}`}>Create New Department</h3>
                 <button 
                   onClick={() => setIsCreating(false)}
-                  className="text-gray-400 hover:text-white"
+                  className={textSecondaryClass}
                 >
                   &times;
                 </button>
@@ -474,29 +509,27 @@ const Departments: React.FC = () => {
             
             <form onSubmit={handleCreateDepartment} className="p-6 space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Department Name *
                 </label>
                 <input
                   type="text"
-                  id="name"
                   name="name"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={formData.name}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Description
                 </label>
                 <textarea
-                  id="description"
                   name="description"
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={formData.description}
                   onChange={handleInputChange}
                 />
@@ -506,13 +539,13 @@ const Departments: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCreating(false)}
-                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+                  className={`px-4 py-2 border ${buttonSecondaryClass} rounded-md`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className={`px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                 >
                   Create Department
                 </button>
@@ -525,13 +558,13 @@ const Departments: React.FC = () => {
       {/* Edit Department Modal */}
       {editingDepartment && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
-            <div className="p-6 border-b border-gray-700">
+          <div className={`rounded-lg border w-full max-w-md ${cardBgClass} ${cardBorderClass}`}>
+            <div className={`p-6 border-b ${cardBorderClass}`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Edit Department</h3>
+                <h3 className={`text-lg font-semibold ${textClass}`}>Edit Department</h3>
                 <button 
                   onClick={() => setEditingDepartment(null)}
-                  className="text-gray-400 hover:text-white"
+                  className={textSecondaryClass}
                 >
                   &times;
                 </button>
@@ -540,29 +573,27 @@ const Departments: React.FC = () => {
             
             <form onSubmit={handleUpdateDepartment} className="p-6 space-y-4">
               <div>
-                <label htmlFor="edit-name" className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Department Name *
                 </label>
                 <input
                   type="text"
-                  id="edit-name"
                   name="name"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={editingDepartment.name}
                   onChange={handleInputChange}
                 />
               </div>
               
               <div>
-                <label htmlFor="edit-description" className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
                   Description
                 </label>
                 <textarea
-                  id="edit-description"
                   name="description"
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   value={editingDepartment.description || ''}
                   onChange={handleInputChange}
                 />
@@ -572,13 +603,13 @@ const Departments: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setEditingDepartment(null)}
-                  className="px-4 py-2 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700"
+                  className={`px-4 py-2 border ${buttonSecondaryClass} rounded-md`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className={`px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                 >
                   Update Department
                 </button>
@@ -589,32 +620,32 @@ const Departments: React.FC = () => {
       )}
 
       {/* Departments Table */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+      <div className={`rounded-lg border overflow-hidden ${cardBgClass} ${cardBorderClass}`}>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-700">
-            <thead className="bg-gray-750">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className={tableHeaderClass}>
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Department
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Description
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Status
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Machines
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Created
                 </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th scope="col" className={`px-6 py-3 text-right text-xs font-medium uppercase tracking-wider ${textSecondaryClass}`}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-gray-800 divide-y divide-gray-700">
+            <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center">
@@ -627,21 +658,27 @@ const Departments: React.FC = () => {
                 departments.map((department) => (
                   <tr 
                     key={department._id} 
-                    className={`hover:bg-gray-750 cursor-pointer ${!department.isActive ? 'opacity-70' : ''}`}
+                    className={`${tableRowHoverClass} cursor-pointer ${!department.isActive ? 'opacity-70' : ''}`}
                     onClick={() => navigate(`/department/${department._id}`)}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center ${
-                          department.isActive ? 'bg-blue-500' : 'bg-gray-600'
+                          department.isActive 
+                            ? isDarkMode ? 'bg-blue-500' : 'bg-blue-500'
+                            : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
                         }`}>
                           <Building2 className="h-6 w-6 text-white" />
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-white flex items-center">
+                          <div className={`text-sm font-medium flex items-center ${textClass}`}>
                             {department.name}
                             {!department.isActive && (
-                              <span className="ml-2 text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+                              <span className={`ml-2 text-xs px-2 py-0.5 rounded ${
+                                isDarkMode 
+                                  ? 'bg-gray-700 text-gray-300' 
+                                  : 'bg-gray-200 text-gray-700'
+                              }`}>
                                 Inactive
                               </span>
                             )}
@@ -650,25 +687,29 @@ const Departments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-300 max-w-md truncate">
+                      <div className={`text-sm max-w-md truncate ${textSecondaryClass}`}>
                         {department.description || 'No description'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         department.isActive 
-                          ? 'bg-green-900/50 text-green-400' 
-                          : 'bg-red-900/50 text-red-400'
+                          ? isDarkMode 
+                            ? 'bg-green-900/50 text-green-400' 
+                            : 'bg-green-100 text-green-800'
+                          : isDarkMode 
+                            ? 'bg-red-900/50 text-red-400' 
+                            : 'bg-red-100 text-red-800'
                       }`}>
                         {department.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">
+                      <div className={`text-sm ${textClass}`}>
                         {department.machineCount || 0}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${textSecondaryClass}`}>
                       {new Date(department.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -678,7 +719,11 @@ const Departments: React.FC = () => {
                             e.stopPropagation();
                             setEditingDepartment(department);
                           }}
-                          className="text-blue-400 hover:text-blue-300 p-1 rounded-md hover:bg-gray-700"
+                          className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
+                            isDarkMode 
+                              ? 'text-blue-400 hover:text-blue-300' 
+                              : 'text-blue-600 hover:text-blue-800'
+                          }`}
                           title="Edit"
                         >
                           <Edit className="h-4 w-4" />
@@ -689,11 +734,17 @@ const Departments: React.FC = () => {
                             handleToggleStatus(department._id, department.isActive);
                           }}
                           disabled={statusTogglingId === department._id}
-                          className={`p-1 rounded-md hover:bg-gray-700 ${
+                          className={`p-1 rounded-md ${
+                            statusTogglingId === department._id ? 'opacity-50' : ''
+                          } ${
                             department.isActive 
-                              ? 'text-yellow-400 hover:text-yellow-300' 
-                              : 'text-green-400 hover:text-green-300'
-                          } ${statusTogglingId === department._id ? 'opacity-50' : ''}`}
+                              ? isDarkMode 
+                                ? 'text-yellow-400 hover:text-yellow-300' 
+                                : 'text-amber-600 hover:text-amber-800'
+                              : isDarkMode 
+                                ? 'text-green-400 hover:text-green-300' 
+                                : 'text-green-600 hover:text-green-800'
+                          } hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
                           title={department.isActive ? 'Deactivate' : 'Activate'}
                         >
                           {statusTogglingId === department._id ? (
@@ -710,8 +761,12 @@ const Departments: React.FC = () => {
                             handleDeleteDepartment(department._id);
                           }}
                           disabled={deletingId === department._id}
-                          className={`text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-gray-700 ${
+                          className={`p-1 rounded-md hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} ${
                             deletingId === department._id ? 'opacity-50' : ''
+                          } ${
+                            isDarkMode 
+                              ? 'text-red-400 hover:text-red-300' 
+                              : 'text-red-600 hover:text-red-800'
                           }`}
                           title="Delete permanently"
                         >
@@ -729,16 +784,16 @@ const Departments: React.FC = () => {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <Building2 className="h-12 w-12 text-gray-600 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-400 mb-2">No departments found</h3>
-                      <p className="text-gray-500 max-w-md">
+                      <Building2 className={`h-12 w-12 ${textSecondaryClass} mb-4`} />
+                      <h3 className={`text-lg font-medium mb-2 ${textSecondaryClass}`}>No departments found</h3>
+                      <p className={textSecondaryClass}>
                         {searchTerm || statusFilter !== ''
                           ? 'No departments match your current filters' 
                           : 'Get started by creating your first department'}
                       </p>
                       <button 
                         onClick={() => setIsCreating(true)}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        className={`mt-4 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md`}
                       >
                         Create Department
                       </button>

@@ -130,14 +130,18 @@ const Dashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
+  };
 
   if (error) {
     return (
-      <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-md">
+      <div className={`border rounded-lg p-4 ${
+        isDarkMode 
+          ? 'bg-red-900/20 border-red-800 text-red-200' 
+          : 'bg-red-50 border-red-200 text-red-800'
+      }`}>
         <div className="flex items-center">
           <AlertTriangle className="h-4 w-4 mr-2" />
           <span>{error}</span>
@@ -147,9 +151,13 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className={`space-y-6 ${isDarkMode ? '' : 'text-gray-900'}`}>
+    <div className={`space-y-6 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
       {/* Welcome Header */}
-      <div className={`bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white ${isDarkMode ? '' : 'shadow-lg'}`}>
+      <div className={`bg-gradient-to-r rounded-xl p-6 text-white shadow-lg ${
+        isDarkMode 
+          ? 'from-blue-600 to-indigo-700' 
+          : 'from-blue-600 to-purple-600'
+      }`}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Welcome back, {user?.username}</h1>
@@ -170,70 +178,74 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className={`grid grid-cols-1 ${ isOperator ? 'md:grid-cols-3': 'md:grid-cols-4' } gap-4`}>
-        <div className={`p-6 rounded-lg border ${
+      <div className={`grid grid-cols-1 ${ isOperator ? 'md:grid-cols-3': 'md:grid-cols-4' } gap-6`}>
+        <div className={`p-6 rounded-xl border transition-all duration-200 hover:shadow-lg ${
           isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200 shadow-sm'
+            ? 'bg-gray-800 border-gray-700 hover:border-gray-600' 
+            : 'bg-white border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300'
         }`}>
           <div className="flex items-center">
-            <div className="p-2 bg-blue-600 rounded-lg">
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
               <Building2 className="h-6 w-6 text-white" />
             </div>
             <div className="ml-4">
               <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Departments</p>
-              <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{departments.length}</p>
+              <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{departments.length}</p>
             </div>
           </div>
         </div>
 
-        <div className={`p-6 rounded-lg border ${
+        <div className={`p-6 rounded-xl border transition-all duration-200 hover:shadow-lg ${
           isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200 shadow-sm'
+            ? 'bg-gray-800 border-gray-700 hover:border-gray-600' 
+            : 'bg-white border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300'
         }`}>
           <div className="flex items-center">
-            <div className="p-2 bg-green-600 rounded-lg">
+            <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg">
               <Activity className="h-6 w-6 text-white" />
             </div>
             <div className="ml-4">
               <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Active Machines</p>
-              <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                 {departments.reduce((total, dept) => total + dept.machineCount, 0)}
               </p>
             </div>
           </div>
         </div>
 
-       {!isOperator && <div className={`p-6 rounded-lg border ${
+       {!isOperator && <div className={`p-6 rounded-xl border transition-all duration-200 hover:shadow-lg ${
           isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200 shadow-sm'
+            ? 'bg-gray-800 border-gray-700 hover:border-gray-600' 
+            : 'bg-white border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300'
         }`}>
           <div className="flex items-center">
-            <div className="p-2 bg-yellow-600 rounded-lg">
+            <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl shadow-lg">
               <TrendingUp className="h-6 w-6 text-white" />
             </div>
             <div className="ml-4">
               <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Avg OEE</p>
-              <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{factoryStats.avgOEE}%</p>
+              <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{factoryStats.avgOEE}%</p>
             </div>
           </div>
         </div>
         }
 
-        <div className={`p-6 rounded-lg border ${
+        <div className={`p-6 rounded-xl border transition-all duration-200 hover:shadow-lg ${
           isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200 shadow-sm'
+            ? 'bg-gray-800 border-gray-700 hover:border-gray-600' 
+            : 'bg-white border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300'
         }`}>
           <div className="flex items-center">
-            <div className="p-2 bg-red-600 rounded-lg">
+            <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg">
               <AlertTriangle className="h-6 w-6 text-white" />
             </div>
             <div className="ml-4">
               <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Unclassified Stoppages</p>
-              <p className={`text-2xl font-semibold ${factoryStats.unclassifiedStoppages > 0 ? 'text-red-400 animate-pulse' : (isDarkMode ? 'text-white' : 'text-gray-900')}`}>
+              <p className={`text-2xl font-bold ${
+                factoryStats.unclassifiedStoppages > 0 
+                  ? 'text-red-500 animate-pulse' 
+                  : (isDarkMode ? 'text-white' : 'text-gray-900')
+              }`}>
                 {factoryStats.unclassifiedStoppages}
               </p>
             </div>
@@ -243,7 +255,7 @@ const Dashboard: React.FC = () => {
 
       {/* Departments Grid */}
       <div>
-        <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+        <h2 className={`text-xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
           {isOperator ? 'Your Department' : 'Departments Overview'}
         </h2>
         
@@ -252,16 +264,22 @@ const Dashboard: React.FC = () => {
             <div
               key={department._id}
               onClick={() => handleDepartmentClick(department._id)}
-              className={`rounded-lg border cursor-pointer transition-all duration-200 ${
+              className={`rounded-xl border cursor-pointer transition-all duration-300 group ${
                 isDarkMode 
-                  ? 'bg-gray-800 border-gray-700 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/20' 
-                  : 'bg-white border-gray-200 hover:border-blue-500 hover:shadow-lg shadow-sm'
+                  ? 'bg-gray-800 border-gray-700 hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10' 
+                  : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow-xl shadow-sm hover:shadow-blue-100/50'
               }`}
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{department.name}</h3>
-                  <Building2 className="h-6 w-6 text-blue-400" />
+                  <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{department.name}</h3>
+                  <div className={`p-2 rounded-lg transition-colors ${
+                    isDarkMode ? 'bg-gray-700 group-hover:bg-blue-600' : 'bg-gray-100 group-hover:bg-blue-600'
+                  }`}>
+                    <Building2 className={`h-5 w-5 transition-colors ${
+                      isDarkMode ? 'text-blue-400 group-hover:text-white' : 'text-gray-600 group-hover:text-white'
+                    }`} />
+                  </div>
                 </div>
                 
                 <p className={`text-sm mb-4 line-clamp-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -270,25 +288,25 @@ const Dashboard: React.FC = () => {
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Machines</span>
-                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Machines</span>
+                    <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                       {department.machineCount || 0}
                     </span>
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Status</span>
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Status</span>
                     <div className="flex items-center space-x-2">
-                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
-                      <span className="text-green-400 text-sm">Active</span>
+                      <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                      <span className="text-emerald-600 text-sm font-semibold">Active</span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>OEE</span >
-                    <div className="flex items-center space-x-1">
-                      <Gauge className="h-4 w-4 text-yellow-400" />
-                      <span className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>OEE</span >
+                    <div className="flex items-center space-x-2">
+                      <Gauge className="h-4 w-4 text-amber-500" />
+                      <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                         {department.avgOEE ? `${department.avgOEE}%` : `N/A`} 
                       </span>
                     </div>
@@ -296,8 +314,12 @@ const Dashboard: React.FC = () => {
 
                 </div>
 
-                <div className={`mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <button className="w-full text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors">
+                <div className={`mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                  <button className={`w-full text-sm font-semibold transition-colors py-2 px-4 rounded-lg ${
+                    isDarkMode 
+                      ? 'text-blue-400 hover:text-white hover:bg-blue-600' 
+                      : 'text-blue-600 hover:text-white hover:bg-blue-600'
+                  }`}>
                     View Details →
                   </button>
                 </div>
@@ -307,13 +329,19 @@ const Dashboard: React.FC = () => {
         </div>
 
         {departments.length === 0 && (
-          <div className="text-center py-12">
-            <Building2 className={`h-12 w-12 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-            <h3 className={`text-lg font-medium mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>No departments found</h3>
-            <p className={isDarkMode ? 'text-gray-500' : 'text-gray-600'}>
+          <div className={`text-center py-16 rounded-xl ${
+            isDarkMode ? 'bg-gray-800/50' : 'bg-gray-50'
+          }`}>
+            <div className={`inline-flex p-4 rounded-full mb-4 ${
+              isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
+            }`}>
+              <Building2 className={`h-8 w-8 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+            </div>
+            <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>No departments found</h3>
+            <p className={`max-w-md mx-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               {isOperator 
-                ? 'You have not been assigned to any department yet.'
-                : 'Get started by creating your first department.'
+                ? 'You have not been assigned to any department yet. Please contact your administrator.'
+                : 'Get started by creating your first department to begin monitoring your factory operations.'
               }
             </p>
           </div>

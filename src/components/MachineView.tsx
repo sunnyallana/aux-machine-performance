@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Machine, ProductionTimelineDay, MachineStats, MachineStatus } from '../types';
 import apiService from '../services/api';
@@ -19,10 +19,12 @@ import {
   Edit,
   Info,
 } from 'lucide-react';
+import { ThemeContext } from '../App';
 
 const MachineView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isDarkMode } = useContext(ThemeContext);
   const [machine, setMachine] = useState<Machine | null>(null);
   const [timeline, setTimeline] = useState<ProductionTimelineDay[]>([]);
   const [stats, setStats] = useState<MachineStats | null>(null);
@@ -43,6 +45,21 @@ const MachineView: React.FC = () => {
     y: number;
     visible: boolean;
   } | null>(null);
+
+  // Theme classes
+  const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const cardBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const cardBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textSecondaryClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-white';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+  const buttonPrimaryClass = isDarkMode 
+    ? 'bg-blue-600 hover:bg-blue-700' 
+    : 'bg-blue-600 hover:bg-blue-500';
+  const buttonSecondaryClass = isDarkMode 
+    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+    : 'border-gray-300 text-gray-700 hover:bg-gray-100';
 
   // Handle mouse enter for tooltip
   const handleMouseEnter = (content: string) => (e: React.MouseEvent) => {
@@ -169,7 +186,7 @@ const MachineView: React.FC = () => {
         toast.warning(`Stoppage detected: ${stoppage.duration} minutes`, {
           position: "top-right",
           autoClose: 5000,
-          theme: "dark"
+          theme: isDarkMode ? "dark" : "light"
         });
         // Refresh data
         fetchMachineData();
@@ -303,7 +320,7 @@ const MachineView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className={`flex items-center justify-center h-64 ${bgClass}`}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -311,14 +328,14 @@ const MachineView: React.FC = () => {
 
   if (!machine || !stats) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-400">Machine not found</p>
+      <div className={`text-center py-12 ${bgClass}`}>
+        <p className={textSecondaryClass}>Machine not found</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 min-h-screen p-4 ${bgClass}`}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -329,15 +346,15 @@ const MachineView: React.FC = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="dark"
+        theme={isDarkMode ? "dark" : "light"}
       />
       
       {/* Custom Tooltip */}
       {tooltip && (
         <div 
-          className={`fixed bg-gray-800 text-white text-sm px-3 py-2 rounded-md shadow-lg z-50 border border-gray-700 transition-opacity ${
+          className={`fixed text-sm px-3 py-2 rounded-md shadow-lg z-50 border transition-opacity ${
             tooltip.visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
+          } ${isDarkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-200'}`}
           style={{
             left: tooltip.x + 10,
             top: tooltip.y + 10,
@@ -354,7 +371,7 @@ const MachineView: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+            className={`p-2 ${textSecondaryClass} hover:${textClass} hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-md transition-colors`}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -364,20 +381,20 @@ const MachineView: React.FC = () => {
                 name="name"
                 value={editForm.name}
                 onChange={handleEditChange}
-                className="text-2xl font-bold text-white bg-gray-700 border border-gray-600 rounded px-2 py-1 w-full"
+                className={`text-2xl font-bold ${textClass} ${inputBgClass} border ${inputBorderClass} rounded px-2 py-1 w-full`}
               />
               <textarea
                 name="description"
                 value={editForm.description}
                 onChange={handleEditChange}
-                className="text-gray-400 bg-gray-700 border border-gray-600 rounded px-2 py-1 w-full text-sm"
+                className={`${textSecondaryClass} ${inputBgClass} border ${inputBorderClass} rounded px-2 py-1 w-full text-sm`}
                 rows={2}
               />
             </div>
           ) : (
             <div>
-              <h1 className="text-2xl font-bold text-white">{machine.name}</h1>
-              <p className="text-gray-400">{machine.description}</p>
+              <h1 className={`text-2xl font-bold ${textClass}`}>{machine.name}</h1>
+              <p className={textSecondaryClass}>{machine.description}</p>
             </div>
           )}
         </div>
@@ -392,13 +409,13 @@ const MachineView: React.FC = () => {
             <div className="flex space-x-2">
               <button
                 onClick={() => setIsEditing(false)}
-                className="px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                className={`px-3 py-2 ${buttonSecondaryClass} rounded-md`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
-                className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                className={`px-3 py-2 ${buttonPrimaryClass} text-white rounded-md`}
               >
                 Save
               </button>
@@ -406,7 +423,7 @@ const MachineView: React.FC = () => {
           ) : (
             <button
               onClick={() => setIsEditing(true)}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+              className={`p-2 ${textSecondaryClass} hover:${textClass} hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-md transition-colors`}
               title="Edit machine details"
             >
               <Edit className="h-5 w-5" />
@@ -417,12 +434,14 @@ const MachineView: React.FC = () => {
 
       {/* Mold, Operator Assignment Warning */}
       {warnings.length > 0 && (
-      <div className="bg-yellow-900/30 border border-yellow-500 rounded-lg p-4 mb-6">
+      <div className={`rounded-lg p-4 mb-6 ${
+        isDarkMode ? 'bg-yellow-900/30 border border-yellow-500' : 'bg-yellow-100 border border-yellow-300'
+      }`}>
         <div className="flex items-center space-x-2 mb-2">
-          <AlertTriangle className="h-5 w-5 text-yellow-400" />
-          <h3 className="text-yellow-400 font-medium">Assignment Warnings</h3>
+          <AlertTriangle className={`h-5 w-5 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
+          <h3 className={`${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} font-medium`}>Assignment Warnings</h3>
         </div>
-        <ul className="list-disc pl-5 text-yellow-300">
+        <ul className={`list-disc pl-5 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-700'}`}>
           {warnings.map((warning, index) => (
             <li key={index}>{warning}</li>
           ))}
@@ -433,73 +452,73 @@ const MachineView: React.FC = () => {
       {/* Key Metrics - Compact Layout */}
       <div className="grid grid-cols-4 gap-2">
         <div 
-          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          className={`p-3 rounded-lg border flex items-center relative ${cardBgClass} ${cardBorderClass}`}
           onMouseEnter={handleMouseEnter('Total units produced in the selected time period')}
           onMouseLeave={handleMouseLeave}
           onMouseMove={handleMouseMove}
         >
-          <TrendingUp className="h-6 w-6 text-green-400 mr-3" />
+          <TrendingUp className={`h-6 w-6 mr-3 ${isDarkMode ? 'text-green-400' : 'text-green-500'}`} />
           <div>
-            <p className="text-xs text-gray-400 flex items-center">
+            <p className={`text-xs flex items-center ${textSecondaryClass}`}>
               Units
-              <Info className="h-3 w-3 ml-1 text-gray-500" />
+              <Info className="h-3 w-3 ml-1" />
             </p>
-            <p className="text-lg font-semibold text-white">{stats.totalUnitsProduced}</p>
+            <p className={`text-lg font-semibold ${textClass}`}>{stats.totalUnitsProduced}</p>
           </div>
         </div>
 
         <div 
-          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          className={`p-3 rounded-lg border flex items-center relative ${cardBgClass} ${cardBorderClass}`}
           onMouseEnter={handleMouseEnter('Overall Equipment Effectiveness (Availability × Performance × Quality)')}
           onMouseLeave={handleMouseLeave}
           onMouseMove={handleMouseMove}
         >
-          <Gauge className="h-6 w-6 text-yellow-400 mr-3" />
+          <Gauge className={`h-6 w-6 mr-3 ${isDarkMode ? 'text-yellow-400' : 'text-amber-500'}`} />
           <div>
-            <p className="text-xs text-gray-400 flex items-center">
+            <p className={`text-xs flex items-center ${textSecondaryClass}`}>
               OEE
-              <Info className="h-3 w-3 ml-1 text-gray-500" />
+              <Info className="h-3 w-3 ml-1" />
             </p>
-            <p className="text-lg font-semibold text-yellow-400">{stats.oee}%</p>
+            <p className={`text-lg font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>{stats.oee}%</p>
           </div>
         </div>
 
         <div 
-          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          className={`p-3 rounded-lg border flex items-center relative ${cardBgClass} ${cardBorderClass}`}
           onMouseEnter={handleMouseEnter('Mean Time Between Failures (average time between breakdowns)')}
           onMouseLeave={handleMouseLeave}
           onMouseMove={handleMouseMove}
         >
-          <Clock className="h-6 w-6 text-blue-400 mr-3" />
+          <Clock className={`h-6 w-6 mr-3 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
           <div>
-            <p className="text-xs text-gray-400 flex items-center">
+            <p className={`text-xs flex items-center ${textSecondaryClass}`}>
               MTBF
-              <Info className="h-3 w-3 ml-1 text-gray-500" />
+              <Info className="h-3 w-3 ml-1" />
             </p>
-            <p className="text-lg font-semibold text-blue-400">{stats.mtbf}m</p>
+            <p className={`text-lg font-semibold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{stats.mtbf}m</p>
           </div>
         </div>
 
         <div 
-          className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center relative"
+          className={`p-3 rounded-lg border flex items-center relative ${cardBgClass} ${cardBorderClass}`}
           onMouseEnter={handleMouseEnter('Mean Time To Repair (average time to repair a breakdown)')}
           onMouseLeave={handleMouseLeave}
           onMouseMove={handleMouseMove}
         >
-          <Activity className="h-6 w-6 text-purple-400 mr-3" />
+          <Activity className={`h-6 w-6 mr-3 ${isDarkMode ? 'text-purple-400' : 'text-purple-500'}`} />
           <div>
-            <p className="text-xs text-gray-400 flex items-center">
+            <p className={`text-xs flex items-center ${textSecondaryClass}`}>
               MTTR
-              <Info className="h-3 w-3 ml-1 text-gray-500" />
+              <Info className="h-3 w-3 ml-1" />
             </p>
-            <p className="text-lg font-semibold text-purple-400">{stats.mttr}m</p>
+            <p className={`text-lg font-semibold ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>{stats.mttr}m</p>
           </div>
         </div>
       </div>
 
       {/* Time Period Selector */}
       <div className="flex items-center space-x-2">
-        <span className="text-sm text-gray-400">Time Period:</span>
+        <span className={`text-sm ${textSecondaryClass}`}>Time Period:</span>
         <div className="flex space-x-1">
           {[
             { value: '24h', label: '24 Hours' },
@@ -512,7 +531,7 @@ const MachineView: React.FC = () => {
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
                 selectedPeriod === period.value
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : `${buttonSecondaryClass}`
               }`}
             >
               {period.label}
@@ -523,8 +542,8 @@ const MachineView: React.FC = () => {
 
       {/* Detailed Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-          <h3 className="text-lg font-semibold text-white mb-4">Performance Metrics</h3>
+        <div className={`p-6 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
+          <h3 className={`text-lg font-semibold ${textClass} mb-4`}>Performance Metrics</h3>
           <div className="space-y-4">
             <div 
               className="flex justify-between items-center relative"
@@ -532,18 +551,18 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Availability
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
               <div className="flex items-center space-x-2">
-                <div className="w-20 bg-gray-700 rounded-full h-2">
+                <div className={`w-20 rounded-full h-2 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                   <div 
                     className="bg-green-500 h-2 rounded-full" 
                     style={{ width: `${stats.availability}%` }}
                   ></div>
                 </div>
-                <span className="text-white font-medium">{stats.availability}%</span>
+                <span className={`font-medium ${textClass}`}>{stats.availability}%</span>
               </div>
             </div>
             
@@ -553,18 +572,18 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Quality
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
               <div className="flex items-center space-x-2">
-                <div className="w-20 bg-gray-700 rounded-full h-2">
+                <div className={`w-20 rounded-full h-2 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                   <div 
                     className="bg-blue-500 h-2 rounded-full" 
                     style={{ width: `${stats.quality}%` }}
                   ></div>
                 </div>
-                <span className="text-white font-medium">{stats.quality}%</span>
+                <span className={`font-medium ${textClass}`}>{stats.quality}%</span>
               </div>
             </div>
             
@@ -574,25 +593,25 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Performance
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
               <div className="flex items-center space-x-2">
-                <div className="w-20 bg-gray-700 rounded-full h-2">
+                <div className={`w-20 rounded-full h-2 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                   <div 
                     className="bg-yellow-500 h-2 rounded-full" 
                     style={{ width: `${stats.performance}%` }}
                   ></div>
                 </div>
-                <span className="text-white font-medium">{stats.performance}%</span>
+                <span className={`font-medium ${textClass}`}>{stats.performance}%</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-          <h3 className="text-lg font-semibold text-white mb-4">Quality Metrics</h3>
+        <div className={`p-6 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
+          <h3 className={`text-lg font-semibold ${textClass} mb-4`}>Quality Metrics</h3>
           <div className="space-y-4">
             <div 
               className="flex justify-between items-center relative"
@@ -600,11 +619,11 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Good Units
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
-              <span className="text-green-400 font-medium">
+              <span className={`font-medium ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                 {stats.totalUnitsProduced - stats.totalDefectiveUnits}
               </span>
             </div>
@@ -614,11 +633,11 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Defective Units
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
-              <span className="text-red-400 font-medium">{stats.totalDefectiveUnits}</span>
+              <span className={`font-medium ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{stats.totalDefectiveUnits}</span>
             </div>
             <div 
               className="flex justify-between items-center relative"
@@ -626,11 +645,11 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Defect Rate
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
-              <span className="text-yellow-400 font-medium">
+              <span className={`font-medium ${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
                 {stats.totalUnitsProduced > 0 
                   ? ((stats.totalDefectiveUnits / stats.totalUnitsProduced) * 100).toFixed(1)
                   : 0
@@ -640,8 +659,8 @@ const MachineView: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-          <h3 className="text-lg font-semibold text-white mb-4">Reliability</h3>
+        <div className={`p-6 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
+          <h3 className={`text-lg font-semibold ${textClass} mb-4`}>Reliability</h3>
           <div className="space-y-4">
             <div 
               className="flex justify-between items-center relative"
@@ -649,15 +668,18 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Current Status
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
               <span className={`font-medium capitalize ${
-                machine.status === 'running' ? 'text-green-400' :
-                machine.status === 'inactive' ? 'text-red-400' :
-                machine.status === 'stopped_yet_producing' ? 'text-yellow-400' :
-                'text-red-400'
+                machine.status === 'running' 
+                  ? isDarkMode ? 'text-green-400' : 'text-green-600' :
+                machine.status === 'inactive' 
+                  ? isDarkMode ? 'text-red-400' : 'text-red-600' :
+                machine.status === 'stopped_yet_producing' 
+                  ? isDarkMode ? 'text-orange-400' : 'text-orange-600' :
+                  isDarkMode ? 'text-red-400' : 'text-red-600'
               }`}>
                 {machine.status}
               </span>
@@ -668,11 +690,11 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 MTBF
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
-              <span className="text-blue-400 font-medium">{stats.mtbf} minutes</span>
+              <span className={`font-medium ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{stats.mtbf} minutes</span>
             </div>
             <div 
               className="flex justify-between items-center relative"
@@ -680,11 +702,11 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 MTTR
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
-              <span className="text-purple-400 font-medium">{stats.mttr} minutes</span>
+              <span className={`font-medium ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>{stats.mttr} minutes</span>
             </div>
             <div 
               className="flex justify-between items-center relative"
@@ -692,11 +714,11 @@ const MachineView: React.FC = () => {
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              <span className="text-gray-400 flex items-center">
+              <span className={`flex items-center ${textSecondaryClass}`}>
                 Running Time
-                <Info className="h-3 w-3 ml-1 text-gray-500" />
+                <Info className="h-3 w-3 ml-1" />
               </span>
-              <span className="text-green-400 font-medium">
+              <span className={`font-medium ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                 {Math.round((stats.totalRunningMinutes || 0) / 60 * 10) / 10}h
               </span>
             </div>
@@ -705,10 +727,10 @@ const MachineView: React.FC = () => {
       </div>
 
       {/* Production Timeline */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">Real-time Production Timeline</h2>
-          <p className="text-sm text-gray-400 mt-1">
+      <div className={`rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
+        <div className={`p-6 border-b ${cardBorderClass}`}>
+          <h2 className={`text-lg font-semibold ${textClass}`}>Real-time Production Timeline</h2>
+          <p className={`text-sm mt-1 ${textSecondaryClass}`}>
             Live production data with operator and mold information
           </p>
         </div>
