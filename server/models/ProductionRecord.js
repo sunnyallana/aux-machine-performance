@@ -93,6 +93,8 @@ productionRecordSchema.pre('save', function(next) {
       );
       hour.stoppageMinutes = Math.min(60, calculated);
     }
+
+    
   });
   next();
 });

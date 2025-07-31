@@ -58,7 +58,9 @@ router.get('/', auth, adminAuth, async (req, res) => {
 // Create machine (Admin only)
 router.post('/', auth, adminAuth, async (req, res) => {
   try {
-    const machine = new Machine({...req.body,
+    const machine = new Machine({
+      ...req.body,
+      dimensions: req.body.dimensions || { width: 200, height: 200 },
       status: req.body.status || 'inactive'
     });
     await machine.save();
@@ -88,10 +90,13 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
 // Update machine position (for drag and drop)
 router.patch('/:id/position', auth, adminAuth, async (req, res) => {
   try {
-    const { x, y } = req.body;
+    const { x, y, width, height } = req.body;
     const machine = await Machine.findByIdAndUpdate(
       req.params.id,
-      { position: { x, y } },
+      { 
+        position: { x, y },
+        dimensions: { width, height }
+      },
       { new: true }
     );
     if (!machine) {

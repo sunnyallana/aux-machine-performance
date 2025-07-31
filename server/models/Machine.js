@@ -19,6 +19,10 @@ const machineSchema = new mongoose.Schema({
     x: { type: Number, default: 0 },
     y: { type: Number, default: 0 }
   },
+  dimensions: {
+    width: { type: Number, default: 154 },
+    height: { type: Number, default: 152 }
+  },
   status: {
     type: String,
     enum: ['running', 'stoppage', 'stopped_yet_producing', 'inactive'],

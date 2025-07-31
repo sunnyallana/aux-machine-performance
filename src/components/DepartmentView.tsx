@@ -40,11 +40,14 @@ const DepartmentView: React.FC = () => {
   });
   const [editLayoutMode, setEditLayoutMode] = useState(false);
   const [positions, setPositions] = useState<{[key: string]: {x: number; y: number}}>({});
+  const [dimensions, setDimensions] = useState<{[key: string]: {width: number; height: number}}>({});
   const [draggingMachineId, setDraggingMachineId] = useState<string | null>(null);
+  const [resizingMachineId, setResizingMachineId] = useState<string | null>(null);
   const [machineStatuses, setMachineStatuses] = useState<{[key: string]: string}>({});
   const layoutContainerRef = useRef<HTMLDivElement>(null);
   const [machineStats, setMachineStats] = useState<{[machineId: string]: MachineStats}>({});
   const dragOffset = useRef({ x: 0, y: 0 });
+  const resizeInitial = useRef({ width: 0, height: 0, x: 0, y: 0 });
   const machinesRef = useRef<Machine[]>([]);
   machinesRef.current = machines;
 
@@ -169,11 +172,18 @@ const DepartmentView: React.FC = () => {
       setMachines(deptData.machines || []);
       
       const initialPositions: {[key: string]: {x: number; y: number}} = {};
+      const initialDimensions: {[key: string]: {width: number; height: number}} = {};
+      
       deptData.machines?.forEach((machine: Machine) => {
         initialPositions[machine._id] = { ...machine.position };
+        initialDimensions[machine._id] = { 
+          width: machine.dimensions?.width || 154, 
+          height: machine.dimensions?.height || 152 
+        };
       });
 
       setPositions(initialPositions);
+      setDimensions(initialDimensions);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch department data';
       toast.error(message);
@@ -251,6 +261,13 @@ const DepartmentView: React.FC = () => {
         ...positions,
         [createdMachine._id]: createdMachine.position
       });
+      setDimensions({
+        ...dimensions,
+        [createdMachine._id]: { 
+          width: createdMachine.dimensions?.width || 154, 
+          height: createdMachine.dimensions?.height || 152 
+        }
+      });
       setIsAddingMachine(false);
       setNewMachine({
         name: '',
@@ -270,8 +287,20 @@ const DepartmentView: React.FC = () => {
         await apiService.deleteMachine(machineId);
         setMachines(machines.filter(m => m._id !== machineId));
         
+        // Remove from positions and dimensions to prevent errors
+        const newPositions = { ...positions };
+        delete newPositions[machineId];
+        setPositions(newPositions);
+        
+        const newDimensions = { ...dimensions };
+        delete newDimensions[machineId];
+        setDimensions(newDimensions);
+        
         if (draggingMachineId === machineId) {
           setDraggingMachineId(null);
+        }
+        if (resizingMachineId === machineId) {
+          setResizingMachineId(null);
         }
         toast.success('Machine deleted successfully');
       } catch (err) {
@@ -297,41 +326,101 @@ const DepartmentView: React.FC = () => {
     setDraggingMachineId(machineId);
   };
 
+  const handleResizeMouseDown = (machineId: string, e: React.MouseEvent) => {
+    if (!editLayoutMode || !layoutContainerRef.current) return;
+    e.stopPropagation();
+    
+    setResizingMachineId(machineId);
+    resizeInitial.current = {
+      width: dimensions[machineId]?.width || 154,
+      height: dimensions[machineId]?.height || 152,
+      x: e.clientX,
+      y: e.clientY
+    };
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!editLayoutMode || !draggingMachineId || !layoutContainerRef.current) return;
+    if (!editLayoutMode || !layoutContainerRef.current) return;
     
-    const containerRect = layoutContainerRef.current.getBoundingClientRect();
-    const x = e.clientX - containerRect.left - dragOffset.current.x;
-    const y = e.clientY - containerRect.top - dragOffset.current.y;
+    // Handle dragging
+    if (draggingMachineId) {
+      const containerRect = layoutContainerRef.current.getBoundingClientRect();
+      const x = e.clientX - containerRect.left - dragOffset.current.x;
+      const y = e.clientY - containerRect.top - dragOffset.current.y;
+      
+      const boundedX = Math.max(10, Math.min(x, containerRect.width - (dimensions[draggingMachineId]?.width || 154)));
+      const boundedY = Math.max(10, Math.min(y, containerRect.height - (dimensions[draggingMachineId]?.height || 152)));
+      
+      setPositions(prev => ({
+        ...prev,
+        [draggingMachineId]: { x: boundedX, y: boundedY }
+      }));
+    }
     
-    const boundedX = Math.max(10, Math.min(x, containerRect.width - 210));
-    const boundedY = Math.max(10, Math.min(y, containerRect.height - 210));
-    
-    setPositions(prev => ({
-      ...prev,
-      [draggingMachineId]: { x: boundedX, y: boundedY }
-    }));
+    // Handle resizing
+    if (resizingMachineId) {
+      const deltaX = e.clientX - resizeInitial.current.x;
+      const deltaY = e.clientY - resizeInitial.current.y;
+      
+      // Allow resizing down to 50x50
+      const newWidth = Math.max(50, resizeInitial.current.width + deltaX);
+      const newHeight = Math.max(50, resizeInitial.current.height + deltaY);
+      
+      setDimensions(prev => ({
+        ...prev,
+        [resizingMachineId]: {
+          width: newWidth,
+          height: newHeight
+        }
+      }));
+    }
   };
 
   const handleMouseUp = async () => {
-    if (!editLayoutMode || !draggingMachineId) return;
+    if (!editLayoutMode) return;
     
-    if (!machines.some(m => m._id === draggingMachineId)) {
-      setDraggingMachineId(null);
-      return;
-    }
+    // Handle dragging save
+    if (draggingMachineId) {
+      if (!machines.some(m => m._id === draggingMachineId)) {
+        setDraggingMachineId(null);
+        return;
+      }
 
-    try {
-      await apiService.updateMachinePosition(
-        draggingMachineId, 
-        positions[draggingMachineId]
-      );
-      toast.success('Machine position updated');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update machine position';
-      toast.error(message);
-    } finally {
-      setDraggingMachineId(null);
+      try {
+        await apiService.updateMachinePosition(
+          draggingMachineId, 
+          positions[draggingMachineId],
+          dimensions[draggingMachineId]
+        );
+        toast.success('Machine position updated');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to update machine position';
+        toast.error(message);
+      } finally {
+        setDraggingMachineId(null);
+      }
+    }
+    
+    // Handle resizing save
+    if (resizingMachineId) {
+      if (!machines.some(m => m._id === resizingMachineId)) {
+        setResizingMachineId(null);
+        return;
+      }
+
+      try {
+        await apiService.updateMachinePosition(
+          resizingMachineId, 
+          positions[resizingMachineId],
+          dimensions[resizingMachineId]
+        );
+        toast.success('Machine size updated');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to update machine size';
+        toast.error(message);
+      } finally {
+        setResizingMachineId(null);
+      }
     }
   };
 
@@ -343,10 +432,21 @@ const DepartmentView: React.FC = () => {
           acc[machineId] = positions[machineId];
           return acc;
         }, {} as {[key: string]: {x: number; y: number}});
+      
+      const validDimensions = Object.keys(dimensions)
+        .filter(machineId => machines.some(m => m._id === machineId))
+        .reduce((acc, machineId) => {
+          acc[machineId] = dimensions[machineId];
+          return acc;
+        }, {} as {[key: string]: {width: number; height: number}});
 
       await Promise.all(
         Object.entries(validPositions).map(([machineId, position]) => 
-          apiService.updateMachinePosition(machineId, position)
+          apiService.updateMachinePosition(
+            machineId, 
+            position,
+            validDimensions[machineId]
+          )
         )
       );
       setEditLayoutMode(false);
@@ -493,85 +593,163 @@ const DepartmentView: React.FC = () => {
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              {machines.map((machine) => (
-                <div
-                  key={machine._id}
-                  onClick={() => handleMachineClick(machine._id)}
-                  className={`absolute rounded-lg p-4 border ${
-                    editLayoutMode 
-                      ? `${isDarkMode ? 'border-blue-500' : 'border-blue-600'} cursor-move` 
-                      : `${cardBorderClass} ${isDarkMode ? 'hover:border-blue-500' : 'hover:border-blue-600'}`
-                  } transition-all duration-200 ${
-                    isDarkMode ? 'hover:shadow-lg hover:shadow-blue-500/10' : 'hover:shadow-md hover:shadow-blue-500/20'
-                  }`}
-                  style={{
-                    left: `${positions[machine._id]?.x || 0}px`,
-                    top: `${positions[machine._id]?.y || 0}px`,
-                    width: '200px',
-                    zIndex: draggingMachineId === machine._id ? 10 : 1,
-                    cursor: editLayoutMode ? 'move' : 'pointer',
-                    transform: draggingMachineId === machine._id ? 'scale(1.02)' : 'none',
-                    transition: draggingMachineId === machine._id ? 'none' : 'all 0.2s ease',
-                    boxShadow: draggingMachineId === machine._id 
-                      ? isDarkMode 
-                        ? '0 10px 25px rgba(0, 0, 0, 0.3)' 
-                        : '0 10px 15px rgba(0, 0, 0, 0.1)'
-                      : 'none',
-                    backgroundColor: isDarkMode ? '#1f2937' : '#f9fafb'
-                  }}
-                  onMouseDown={(e) => handleMouseDown(machine._id, e)}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className={`font-medium ${textClass} truncate`}>{machine.name}</h3>
-                    <div className="flex items-center space-x-2">
-                      <div className={`h-3 w-3 rounded-full ${getStatusColor(machineStatuses[machine._id] as MachineStatus || machine.status as MachineStatus)}`}></div>
-                      {editLayoutMode && (
-                        <button
-                          onClick={(e) => handleDeleteMachine(machine._id, e)}
-                          className={`p-1 rounded-md ${isDarkMode ? 'text-red-400 hover:text-red-300 hover:bg-gray-700' : 'text-red-600 hover:text-red-800 hover:bg-gray-100'}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+              {machines.map((machine) => {
+                const width = dimensions[machine._id]?.width || 154;
+                const height = dimensions[machine._id]?.height || 152;
+                const isSmall = width < 100 || height < 100;
+                
+                return (
+                  <div
+                    key={machine._id}
+                    onClick={() => handleMachineClick(machine._id)}
+                    className={`absolute rounded-lg border ${
+                      editLayoutMode 
+                        ? `${isDarkMode ? 'border-blue-500' : 'border-blue-600'} cursor-move` 
+                        : `${cardBorderClass} ${isDarkMode ? 'hover:border-blue-500' : 'hover:border-blue-600'}`
+                    } transition-all duration-200 ${
+                      isDarkMode ? 'hover:shadow-lg hover:shadow-blue-500/10' : 'hover:shadow-md hover:shadow-blue-500/20'
+                    }`}
+                    style={{
+                      left: `${positions[machine._id]?.x || 0}px`,
+                      top: `${positions[machine._id]?.y || 0}px`,
+                      width: `${width}px`,
+                      height: `${height}px`,
+                      zIndex: (draggingMachineId === machine._id || resizingMachineId === machine._id) ? 10 : 1,
+                      cursor: editLayoutMode ? 'move' : 'pointer',
+                      transform: (draggingMachineId === machine._id || resizingMachineId === machine._id) ? 'scale(1.02)' : 'none',
+                      transition: (draggingMachineId === machine._id || resizingMachineId === machine._id) ? 'none' : 'all 0.2s ease',
+                      boxShadow: (draggingMachineId === machine._id || resizingMachineId === machine._id) 
+                        ? isDarkMode 
+                          ? '0 10px 25px rgba(0, 0, 0, 0.3)' 
+                          : '0 10px 15px rgba(0, 0, 0, 0.1)'
+                        : 'none',
+                      backgroundColor: isDarkMode ? '#1f2937' : '#f9fafb',
+                      padding: isSmall ? '0.25rem' : '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                    onMouseDown={(e) => handleMouseDown(machine._id, e)}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <h3 
+                        className={`font-medium ${textClass} truncate`}
+                        style={{
+                          fontSize: isSmall ? '0.65rem' : '0.875rem',
+                          maxWidth: isSmall ? `${width - 30}px` : '100%'
+                        }}
+                      >
+                        {machine.name}
+                      </h3>
+                      <div className="flex items-center space-x-1">
+                        <div 
+                          className={`rounded-full ${getStatusColor(machineStatuses[machine._id] as MachineStatus || machine.status as MachineStatus)}`}
+                          style={{
+                            width: isSmall ? '0.5rem' : '0.75rem',
+                            height: isSmall ? '0.5rem' : '0.75rem',
+                            minWidth: isSmall ? '0.5rem' : '0.75rem'
+                          }}
+                        ></div>
+                        {editLayoutMode && !isSmall && (
+                          <button
+                            onClick={(e) => handleDeleteMachine(machine._id, e)}
+                            className={`p-1 rounded-md ${isDarkMode ? 'text-red-400 hover:text-red-300 hover:bg-gray-700' : 'text-red-600 hover:text-red-800 hover:bg-gray-100'}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <p className={`text-sm ${textSecondaryClass} mb-3 line-clamp-2`}>
-                    {machine.description || 'No description'}
-                  </p>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={textSecondaryClass}>Status</span>
-                        <span className={`font-medium ${
+                    
+                    <div className="flex items-center justify-between w-full mt-1">
+                      <span 
+                        className={`${textSecondaryClass} truncate`}
+                        style={{ 
+                          fontSize: isSmall ? '0.65rem' : '0.75rem',
+                        }}
+                      >
+                        {machine.description || 'No description'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between w-full mt-1">
+                      <span 
+                        className={`font-medium ${
                           (machineStatuses[machine._id] || machine.status) === 'running' 
                             ? isDarkMode ? 'text-green-400' : 'text-green-600' :
                           (machineStatuses[machine._id] || machine.status) === 'stoppage' 
                             ? isDarkMode ? 'text-red-400' : 'text-red-600' :
                           (machineStatuses[machine._id] || machine.status) === 'stopped_yet_producing' 
                             ? isDarkMode ? 'text-orange-400' : 'text-orange-600' :
-                          textSecondaryClass // inactive
-                        }`}>
+                          textSecondaryClass
+                        }`}
+                        style={{ fontSize: isSmall ? '0.65rem' : '0.75rem' }}
+                      >
                         {getStatusText(machineStatuses[machine._id] as MachineStatus || machine.status as MachineStatus)}
                       </span>
                     </div>
                     
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={textSecondaryClass}>OEE</span>
-                      <span className={`font-medium ${textClass}`}>
-                        {machineStats[machine._id]?.oee ?? 'N/A'}%
-                      </span>
-                    </div>
+                    {!isSmall && (
+                      <div className="space-y-1 mt-auto">
+                        <div className="flex items-center justify-between w-full">
+                          <span 
+                            className={textSecondaryClass}
+                            style={{ fontSize: '0.7rem' }}
+                          >
+                            OEE
+                          </span>
+                          <span 
+                            className={`font-medium ${textClass}`}
+                            style={{ fontSize: '0.7rem' }}
+                          >
+                            {machineStats[machine._id]?.oee ?? 'N/A'}%
+                          </span>
+                        </div>
 
-                   <div className="flex items-center justify-between text-sm">
-                    <span className={textSecondaryClass}>Today's Units</span>
-                    <span className={`font-medium ${textClass}`}>
-                      {machineStats[machine._id]?.totalUnitsProduced ?? 'N/A'}
-                    </span>
+                        <div className="flex items-center justify-between w-full">
+                          <span 
+                            className={textSecondaryClass}
+                            style={{ fontSize: '0.7rem' }}
+                          >
+                            Units
+                          </span>
+                          <span 
+                            className={`font-medium ${textClass}`}
+                            style={{ fontSize: '0.7rem' }}
+                          >
+                            {machineStats[machine._id]?.totalUnitsProduced ?? 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {editLayoutMode && (
+                      <div 
+                        className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+                        onMouseDown={(e) => handleResizeMouseDown(machine._id, e)}
+                      >
+                        <div 
+                          className={`w-full h-full`}
+                          style={{ 
+                            borderBottom: `2px solid ${isDarkMode ? 'white' : 'black'}`,
+                            borderRight: `2px solid ${isDarkMode ? 'white' : 'black'}`,
+                            borderBottomRightRadius: '0.25rem'
+                          }} 
+                        />
+                      </div>
+                    )}
+                    
+                    {editLayoutMode && isSmall && (
+                      <button
+                        onClick={(e) => handleDeleteMachine(machine._id, e)}
+                        className={`absolute top-0 right-0 p-1 rounded-md ${isDarkMode ? 'text-red-400 hover:text-red-300 hover:bg-gray-700' : 'text-red-600 hover:text-red-800 hover:bg-gray-100'}`}
+                        style={{ zIndex: 20 }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
-                </div>
-              </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -660,7 +838,7 @@ const DepartmentView: React.FC = () => {
           <div className={`${isDarkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
             <p className="flex items-center">
               <Edit className="h-4 w-4 mr-2" />
-              <span>Layout Edit Mode: Drag machines to reposition, click trash icon to delete</span>
+              <span>Layout Edit Mode: Drag machines to reposition, resize with bottom-right handle, or delete with trash icon</span>
             </p>
           </div>
           <div className="flex space-x-2">

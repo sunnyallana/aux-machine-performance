@@ -152,12 +152,22 @@ class ApiService {
     });
   }
 
-  async updateMachinePosition(id: string, position: { x: number; y: number }) {
+  async updateMachinePosition(
+    id: string, 
+    position: { x: number; y: number }, 
+    dimensions: { width: number; height: number }
+  ) {
     return this.request(`/machines/${id}/position`, {
       method: 'PATCH',
-      body: JSON.stringify(position),
+      body: JSON.stringify({ 
+        x: position.x, 
+        y: position.y,
+        width: dimensions.width,
+        height: dimensions.height
+      }),
     });
   }
+
 
   async deleteMachine(id: string) {
     return this.request(`/machines/${id}`, {

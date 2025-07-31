@@ -506,6 +506,11 @@ router.post('/production-assignment', auth, async (req, res) => {
       0
     );
 
+    productionRecord.defectiveUnits = productionRecord.hourlyData.reduce(
+      (sum, h) => sum + (h.defectiveUnits || 0), 
+      0
+    );
+
     // Save the production record
     await productionRecord.save();
 

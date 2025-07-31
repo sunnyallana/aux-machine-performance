@@ -28,6 +28,10 @@ export interface Machine {
   description?: string;
   departmentId: string | Department;
   position: { x: number; y: number };
+  dimensions: {
+    width: number;
+    height: number;
+  };
   status: MachineStatus;
   isActive: boolean;
   createdAt: string;
