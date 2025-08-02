@@ -117,14 +117,20 @@ LineSentry leverages PLCs + Raspberry Pi to ingest real-time signals from generi
    ```
 3. Frontend:
    ```bash
-   cd frontend && npm install
+   npm install
    npm run dev
    ```
 4. PLC Daemon:
    ```bash
-   python python_daemon/signal_daemon.py
+   cd python-daemon
+   python signal_daemon.py
    ```
-
+   or
+   ```bash
+   cd rust-daemon
+   cargo run
+   ```
+   
 ## 9. Usage <a name="usage"></a>
 
 - **Admin Login:**
