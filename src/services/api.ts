@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
 class ApiService {
   private axiosInstance: AxiosInstance;
@@ -32,16 +32,16 @@ class ApiService {
     );
 
     // Response interceptor for error handling
-    this.axiosInstance.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          this.clearToken();
-          window.location.href = '/login';
-        }
-        return Promise.reject(error);
-      }
-    );
+    // this.axiosInstance.interceptors.response.use(
+    //   (response) => response,
+    //   (error) => {
+    //     if (error.response?.status === 401) {
+    //       this.clearToken();
+    //       window.location.href = '/login';
+    //     }
+    //     return Promise.reject(error);
+    //   }
+    // );
   }
 
   setToken(token: string) {
@@ -408,11 +408,6 @@ class ApiService {
     return this.request(`/reports/${reportId}/email`, {
       method: 'POST',
     });
-  }
-
-  // Generic request method for internal use
-  async request(endpoint: string, options: AxiosRequestConfig = {}) {
-    return this.request(endpoint, options);
   }
 
   // Download PDF with proper handling

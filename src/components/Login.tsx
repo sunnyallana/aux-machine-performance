@@ -21,9 +21,6 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const recaptchaRef = useRef<ReCAPTCHA>(null);
 
-  // Demo CAPTCHA site key (replace with your actual key in production)
-  const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'; // Test key
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -194,7 +191,7 @@ const Login: React.FC = () => {
               <div className="flex justify-center">
                 <ReCAPTCHA
                   ref={recaptchaRef}
-                  sitekey={RECAPTCHA_SITE_KEY}
+                  sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
                   onChange={onCaptchaChange}
                   theme={isDarkMode ? 'dark' : 'light'}
                 />
@@ -213,11 +210,11 @@ const Login: React.FC = () => {
           </form>
 
           <div className={`mt-8 pt-6 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-            <p className={`text-center text-sm mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            {/* <p className={`text-center text-sm mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Demo Environment
-            </p>
+            </p> */}
             
-            {!demoInitialized && (
+            {/* {!demoInitialized && (
               <button
                 onClick={initializeDemo}
                 className={`w-full mb-3 py-2 px-4 border rounded-md text-sm transition-colors ${
@@ -228,9 +225,9 @@ const Login: React.FC = () => {
               >
                 Initialize Demo Accounts
               </button>
-            )}
+            )} */}
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => fillDemoCredentials('admin')}
                 className="py-2 px-4 border border-green-600 rounded-md text-sm text-green-400 hover:bg-green-900/20 transition-colors"
@@ -243,7 +240,7 @@ const Login: React.FC = () => {
               >
                 Operator Demo
               </button>
-            </div>
+            </div> */}
 
             {loginAttempts > 0 && (
               <div className={`mt-4 text-center text-xs ${

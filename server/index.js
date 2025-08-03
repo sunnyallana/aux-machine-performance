@@ -49,7 +49,7 @@ app.use(helmet({
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: 50, // Limit each IP to 10 requests per windowMs
   message: {
     message: 'Too many login attempts, please try again later'
   },
@@ -74,7 +74,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
-app.use(generalLimiter);
+// app.use(generalLimiter);
 
 // Make io available to routes
 app.set('io', io);
