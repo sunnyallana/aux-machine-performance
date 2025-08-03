@@ -6,7 +6,7 @@ import socketService from '../services/socket';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, captchaToken?: string) => Promise<void>;
   logout: () => void;
   isAdmin: boolean;
   isOperator: boolean;
@@ -61,9 +61,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, captchaToken?: string) => {
     try {
-      const response = await apiService.login(username, password);
+      const response = await apiService.login(username, password, captchaToken);
       setUser(response.user);
     } catch (error) {
       throw error;

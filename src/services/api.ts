@@ -1,10 +1,47 @@
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+
 const API_BASE_URL = 'http://localhost:3001/api';
 
 class ApiService {
+  private axiosInstance: AxiosInstance;
   private token: string | null = null;
 
   constructor() {
     this.token = localStorage.getItem('token');
+    
+    // Create axios instance with security configurations
+    this.axiosInstance = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 10000,
+      withCredentials: true, // Include cookies for CSRF protection
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest', // CSRF protection
+      }
+    });
+
+    // Request interceptor to add auth token
+    this.axiosInstance.interceptors.request.use(
+      (config) => {
+        if (this.token) {
+          config.headers.Authorization = `Bearer ${this.token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response interceptor for error handling
+    this.axiosInstance.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          this.clearToken();
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+    );
   }
 
   setToken(token: string) {
@@ -17,32 +54,26 @@ class ApiService {
     localStorage.removeItem('token');
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(this.token && { Authorization: `Bearer ${this.token}` }),
-      ...options.headers,
-    };
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Network error' }));
-      throw new Error(error.message || `HTTP ${response.status}`);
+  private async request(endpoint: string, options: AxiosRequestConfig = {}) {
+    try {
+      const response = await this.axiosInstance({
+        url: endpoint,
+        ...options
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error(error.message || 'Network error');
     }
-
-    return response.json();
   }
 
   // Auth
-  async login(username: string, password: string) {
+  async login(username: string, password: string, captchaToken?: string) {
     const response = await this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      data: { username, password, captchaToken },
     });
     this.setToken(response.token);
     return response;
@@ -77,37 +108,23 @@ class ApiService {
     sortBy?: string;
     sortOrder?: string;
   }) {
-    let endpoint = '/departments/admin/all';
-    
-    if (params) {
-      const searchParams = new URLSearchParams();
-      
-      if (params.page) searchParams.append('page', params.page.toString());
-      if (params.limit) searchParams.append('limit', params.limit.toString());
-      if (params.search) searchParams.append('search', params.search);
-      if (params.isActive) searchParams.append('isActive', params.isActive);
-      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
-      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
-      
-      if (searchParams.toString()) {
-        endpoint += `?${searchParams.toString()}`;
-      }
-    }
-    
-    return this.request(endpoint);
-    }
+    return this.request('/departments/admin/all', {
+      method: 'GET',
+      params
+    });
+  }
 
   async createDepartment(department: any) {
     return this.request('/departments', {
       method: 'POST',
-      body: JSON.stringify(department),
+      data: department,
     });
   }
 
   async updateDepartment(id: string, department: any) {
     return this.request(`/departments/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(department),
+      data: department,
     });
   }
 
@@ -141,14 +158,14 @@ class ApiService {
   async createMachine(machine: any) {
     return this.request('/machines', {
       method: 'POST',
-      body: JSON.stringify(machine),
+      data: machine,
     });
   }
 
   async updateMachine(id: string, machineData: any) {
     return this.request(`/machines/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(machineData),
+      data: machineData,
     });
   }
 
@@ -159,15 +176,14 @@ class ApiService {
   ) {
     return this.request(`/machines/${id}/position`, {
       method: 'PATCH',
-      body: JSON.stringify({ 
+      data: { 
         x: position.x, 
         y: position.y,
         width: dimensions.width,
         height: dimensions.height
-      }),
+      },
     });
   }
-
 
   async deleteMachine(id: string) {
     return this.request(`/machines/${id}`, {
@@ -176,12 +192,11 @@ class ApiService {
   }
 
   // Users
-
   async getUsers() {
     return this.request('/users');
   }
   
-   async getUsersAdmin(params?: {
+  async getUsersAdmin(params?: {
     page?: number;
     limit?: number;
     search?: string;
@@ -191,39 +206,23 @@ class ApiService {
     sortBy?: string;
     sortOrder?: string;
   }) {
-    let endpoint = '/users/admin/all';
-    
-    if (params) {
-      const searchParams = new URLSearchParams();
-      
-      if (params.page) searchParams.append('page', params.page.toString());
-      if (params.limit) searchParams.append('limit', params.limit.toString());
-      if (params.search) searchParams.append('search', params.search);
-      if (params.role) searchParams.append('role', params.role);
-      if (params.department) searchParams.append('department', params.department);
-      if (params.isActive) searchParams.append('isActive', params.isActive);
-      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
-      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
-      
-      if (searchParams.toString()) {
-        endpoint += `?${searchParams.toString()}`;
-      }
-    }
-    
-    return this.request(endpoint);
+    return this.request('/users/admin/all', {
+      method: 'GET',
+      params
+    });
   }
 
   async createUser(user: any) {
     return this.request('/users', {
       method: 'POST',
-      body: JSON.stringify(user),
+      data: user,
     });
   }
 
   async updateUser(id: string, user: any) {
     return this.request(`/users/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(user),
+      data: user,
     });
   }
 
@@ -239,27 +238,29 @@ class ApiService {
   }
 
   async getMachineStats(machineId: string, period: string = '24h') {
-    return this.request(`/analytics/machine-stats/${machineId}?period=${period}`);
+    return this.request(`/analytics/machine-stats/${machineId}`, {
+      params: { period }
+    });
   }
 
   async addStoppageRecord(stoppage: any) {
     return this.request('/analytics/stoppage', {
       method: 'POST',
-      body: JSON.stringify(stoppage),
+      data: stoppage,
     });
   }
 
   async updateStoppageRecord(id: string, stoppage: any) {
     return this.request(`/analytics/stoppage/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(stoppage),
+      data: stoppage,
     });
   }
 
   async updateProductionAssignment(data: any) {
     return this.request('/analytics/production-assignment', {
       method: 'POST',
-      body: JSON.stringify(data),
+      data: data,
     });
   }
 
@@ -269,13 +270,13 @@ class ApiService {
   }
 
   async getShifts() {
-  return this.request('/config/shifts');
-}
+    return this.request('/config/shifts');
+  }
 
   async updateConfig(config: any) {
     return this.request('/config', {
       method: 'PUT',
-      body: JSON.stringify(config),
+      data: config,
     });
   }
 
@@ -298,58 +299,43 @@ class ApiService {
     sortBy?: string;
     sortOrder?: string;
   }) {
-    let endpoint = '/sensors/admin/all';
-    
-    if (params) {
-      const searchParams = new URLSearchParams();
-      
-      if (params.page) searchParams.append('page', params.page.toString());
-      if (params.limit) searchParams.append('limit', params.limit.toString());
-      if (params.search) searchParams.append('search', params.search);
-      if (params.department) searchParams.append('department', params.department);
-      if (params.status) searchParams.append('status', params.status);
-      if (params.sensorType) searchParams.append('sensorType', params.sensorType);
-      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
-      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
-      
-      if (searchParams.toString()) {
-        endpoint += `?${searchParams.toString()}`;
-      }
-    }
-    
-    return this.request(endpoint);
+    return this.request('/sensors/admin/all', {
+      method: 'GET',
+      params
+    });
   }
 
   async createSensor(sensor: any) {
     return this.request('/sensors', {
       method: 'POST',
-      body: JSON.stringify(sensor),
+      data: sensor,
     });
   }
 
-    async updateSensor(id: string, sensorData: any) {
-  return this.request(`/sensors/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(sensorData),
-  });
-}
+  async updateSensor(id: string, sensorData: any) {
+    return this.request(`/sensors/${id}`, {
+      method: 'PUT',
+      data: sensorData,
+    });
+  }
 
   async deleteSensor(id: string) {
     return this.request(`/sensors/${id}`, {
       method: 'DELETE',
     });
   }
-    // Pin mapping
+
+  // Pin mapping
   async deletePinMapping(id: string) {
     return this.request(`/sensors/pin-mapping/${id}`, {
       method: 'DELETE',
     });
   }
 
-   async createPinMapping(mapping: any) {
+  async createPinMapping(mapping: any) {
     return this.request('/sensors/pin-mapping', {
       method: 'POST',
-      body: JSON.stringify(mapping),
+      data: mapping,
     });
   }
 
@@ -357,7 +343,7 @@ class ApiService {
     return this.request('/sensors/pin-mappings');
   }
 
-    // Molds
+  // Molds
   async getMolds() {
     return this.request('/molds');
   }
@@ -371,38 +357,23 @@ class ApiService {
     sortBy?: string;
     sortOrder?: string;
   }) {
-    let endpoint = '/molds/admin/all';
-    
-    if (params) {
-      const searchParams = new URLSearchParams();
-      
-      if (params.page) searchParams.append('page', params.page.toString());
-      if (params.limit) searchParams.append('limit', params.limit.toString());
-      if (params.search) searchParams.append('search', params.search);
-      if (params.department) searchParams.append('department', params.department);
-      if (params.isActive) searchParams.append('isActive', params.isActive);
-      if (params.sortBy) searchParams.append('sortBy', params.sortBy);
-      if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
-      
-      if (searchParams.toString()) {
-        endpoint += `?${searchParams.toString()}`;
-      }
-    }
-    
-    return this.request(endpoint);
+    return this.request('/molds/admin/all', {
+      method: 'GET',
+      params
+    });
   }
 
   async createMold(mold: any) {
     return this.request('/molds', {
       method: 'POST',
-      body: JSON.stringify(mold),
+      data: mold,
     });
   }
 
   async updateMold(id: string, moldData: any) {
     return this.request(`/molds/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(moldData),
+      data: moldData,
     });
   }
 
@@ -420,14 +391,16 @@ class ApiService {
 
   // Reports
   async getReports(filters?: any) {
-    const params = new URLSearchParams(filters).toString();
-    return this.request(`/reports${params ? `?${params}` : ''}`);
+    return this.request('/reports', {
+      method: 'GET',
+      params: filters
+    });
   }
 
   async generateReport(reportData: any) {
     return this.request('/reports/generate', {
       method: 'POST',
-      body: JSON.stringify(reportData),
+      data: reportData,
     });
   }
 
@@ -435,6 +408,37 @@ class ApiService {
     return this.request(`/reports/${reportId}/email`, {
       method: 'POST',
     });
+  }
+
+  // Generic request method for internal use
+  async request(endpoint: string, options: AxiosRequestConfig = {}) {
+    return this.request(endpoint, options);
+  }
+
+  // Download PDF with proper handling
+  async downloadReportPDF(reportId: string, reportType: string, startDate: string) {
+    try {
+      const response = await this.axiosInstance({
+        url: `/reports/${reportId}/pdf`,
+        method: 'GET',
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `${reportType}-report-${startDate}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      return { success: true };
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to download PDF');
+    }
   }
 }
 

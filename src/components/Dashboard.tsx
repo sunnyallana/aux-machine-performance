@@ -105,12 +105,7 @@ const Dashboard: React.FC = () => {
       });
 
       // Get unclassified stoppages count
-      const unclassifiedResponse = await fetch('http://localhost:3001/api/signals/unclassified-stoppages-count', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const unclassifiedData = await unclassifiedResponse.json();
+      const unclassifiedData = await apiService.request('/signals/unclassified-stoppages-count');
 
       setFactoryStats({
         totalUnits,

@@ -186,24 +186,7 @@ const Reports: React.FC = () => {
 
   const handleDownloadPDF = async (reportId: string, reportType: string, startDate: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/reports/${reportId}/pdf`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (!response.ok) throw new Error('Failed to download PDF');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `${reportType}-report-${startDate}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      
+      await apiService.downloadReportPDF(reportId, reportType, startDate);
       toast.success('PDF downloaded successfully');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to download PDF';
@@ -217,12 +200,7 @@ const Reports: React.FC = () => {
     }
 
     try {
-      await fetch(`http://localhost:3001/api/reports/${reportId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      await apiService.request(`/reports/${reportId}`, { method: 'DELETE' });
       
       setReports(reports.filter(r => r._id !== reportId));
       toast.success('Report deleted successfully');

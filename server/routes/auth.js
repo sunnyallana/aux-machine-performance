@@ -4,13 +4,40 @@ const User = require('../models/User');
 const Department = require('../models/Department');
 const { auth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
+const axios = require('axios');
 
 const router = express.Router();
 
+// CAPTCHA verification function
+const verifyCaptcha = async (token) => {
+  if (!token) return false;
+  
+  try {
+    const response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
+      params: {
+        secret: process.env.RECAPTCHA_SECRET_KEY || '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe', // Test secret
+        response: token
+      }
+    });
+    
+    return response.data.success;
+  } catch (error) {
+    console.error('CAPTCHA verification error:', error);
+    return false;
+  }
+};
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, captchaToken } = req.body;
+
+    // Verify CAPTCHA if provided
+    if (captchaToken) {
+      const captchaValid = await verifyCaptcha(captchaToken);
+      if (!captchaValid) {
+        return res.status(400).json({ message: 'Invalid CAPTCHA verification' });
+      }
+    }
 
     const user = await User.findOne({ username }).populate('departmentId');
     if (!user || !(await user.comparePassword(password))) {

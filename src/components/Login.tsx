@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ThemeContext } from '../App';
-import { Factory, User, Lock, AlertCircle } from 'lucide-react';
+import { Factory, User, Lock, AlertCircle, Shield } from 'lucide-react';
+import ReCAPTCHA from 'react-google-recaptcha';
 import apiService from '../services/api';
 
 const Login: React.FC = () => {
@@ -12,20 +13,51 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [demoInitialized, setDemoInitialized] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
   const { login } = useAuth();
   const { isDarkMode } = useContext(ThemeContext);
   const navigate = useNavigate();
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
+
+  // Demo CAPTCHA site key (replace with your actual key in production)
+  const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'; // Test key
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    // Show CAPTCHA after 2 failed attempts or if already shown
+    if (loginAttempts >= 2 || showCaptcha) {
+      if (!captchaToken) {
+        setError('Please complete the CAPTCHA verification');
+        setLoading(false);
+        setShowCaptcha(true);
+        return;
+      }
+    }
+
     try {
-      await login(username, password);
+      await login(username, password, captchaToken || undefined);
       navigate('/dashboard');
     } catch (err) {
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      
+      // Show CAPTCHA after 2 failed attempts
+      if (newAttempts >= 2) {
+        setShowCaptcha(true);
+      }
+      
       setError(err instanceof Error ? err.message : 'Login failed');
+      
+      // Reset CAPTCHA on error
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset();
+        setCaptchaToken(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -37,13 +69,24 @@ const Login: React.FC = () => {
       setDemoInitialized(true);
       setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message :'Failed to initialize demo accounts');
+      setError(err instanceof Error ? err.message : 'Failed to initialize demo accounts');
     }
   };
 
   const fillDemoCredentials = (role: 'admin' | 'operator') => {
     setUsername(role);
     setPassword(`${role}123`);
+    // Reset login attempts when using demo
+    setLoginAttempts(0);
+    setShowCaptcha(false);
+    setCaptchaToken(null);
+    if (recaptchaRef.current) {
+      recaptchaRef.current.reset();
+    }
+  };
+
+  const onCaptchaChange = (token: string | null) => {
+    setCaptchaToken(token);
   };
 
   return (
@@ -63,6 +106,14 @@ const Login: React.FC = () => {
           <p className={`mt-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             Sign in to access your production dashboard
           </p>
+          {showCaptcha && (
+            <div className={`mt-2 flex items-center justify-center space-x-2 text-xs ${
+              isDarkMode ? 'text-yellow-400' : 'text-amber-600'
+            }`}>
+              <Shield className="h-4 w-4" />
+              <span>Security verification required</span>
+            </div>
+          )}
         </div>
 
         <div className={`py-8 px-6 shadow-xl rounded-lg border ${
@@ -138,10 +189,22 @@ const Login: React.FC = () => {
               </div>
             </div>
 
+            {/* CAPTCHA */}
+            {showCaptcha && (
+              <div className="flex justify-center">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={RECAPTCHA_SITE_KEY}
+                  onChange={onCaptchaChange}
+                  theme={isDarkMode ? 'dark' : 'light'}
+                />
+              </div>
+            )}
+
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (showCaptcha && !captchaToken)}
                 className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? 'Signing in...' : 'Sign in'}
@@ -181,6 +244,15 @@ const Login: React.FC = () => {
                 Operator Demo
               </button>
             </div>
+
+            {loginAttempts > 0 && (
+              <div className={`mt-4 text-center text-xs ${
+                isDarkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                Login attempts: {loginAttempts}
+                {loginAttempts >= 2 && ' (CAPTCHA required)'}
+              </div>
+            )}
           </div>
         </div>
       </div>

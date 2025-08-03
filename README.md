@@ -86,10 +86,15 @@ LineSentry leverages PLCs + Raspberry Pi to ingest real-time signals from generi
 - Code
 
 ## 6. Security <a name="security"></a>
-- Authentication: JWT-based access control.
-- API Protection: Rate limiting, Axios (XSS/CSRF mitigation).
+- **Authentication**: JWT-based access control with CAPTCHA protection against brute-force attacks.
+- **API Protection**: 
+  - Axios HTTP client with CSRF tokens and XSS prevention
+  - Rate limiting (5 login attempts per 15 minutes, 100 general requests per 15 minutes)
+  - Helmet.js for security headers
+  - Google reCAPTCHA v2 integration
 - Credentials: .env file (excluded from Git).
 - RBAC: Operators restricted to data entry; Admins own configurations.
+- **Request Security**: All API calls use axios with proper error handling and timeout configuration.
 
 ## 7. Future Improvements <a name="future-improvements"></a>
 - Biometric Security: Card/facial recognition for login.
