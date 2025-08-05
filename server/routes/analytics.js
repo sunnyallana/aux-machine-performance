@@ -109,9 +109,18 @@ async function calculateMachineStats(machineId, period) {
 router.get('/production-timeline/:machineId', auth, async (req, res) => {
   try {
     const { machineId } = req.params;
-    const endDate = new Date();
-    const startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - 7);
+    const { startDate: startParam, endDate: endParam } = req.query;
+    
+    let endDate = new Date();
+    let startDate = new Date(endDate);
+    
+    if (startParam && endParam) {
+      startDate = new Date(startParam as string);
+      endDate = new Date(endParam as string);
+    } else {
+      // Default to 7 days
+      startDate.setDate(startDate.getDate() - 7);
+    }
 
     // Check access permissions
     const machine = await Machine.findById(machineId).populate('departmentId');
@@ -537,7 +546,26 @@ router.post('/production-assignment', auth, async (req, res) => {
 router.get('/machine-stats/:machineId', auth, async (req, res) => {
   try {
     const { machineId } = req.params;
-    const { period = '24h' } = req.query;
+    const { period = '24h', startDate: startParam, endDate: endParam } = req.query;
+    
+    let startDate: Date, endDate: Date;
+    
+    if (startParam && endParam) {
+      startDate = new Date(startParam as string);
+      endDate = new Date(endParam as string);
+    } else {
+      // Use period-based calculation
+      endDate = new Date();
+      startDate = new Date(endDate);
+      
+      if (period === '24h') {
+        startDate.setHours(startDate.getHours() - 24);
+      } else if (period === '7d') {
+        startDate.setDate(startDate.getDate() - 7);
+      } else if (period === '30d') {
+        startDate.setDate(startDate.getDate() - 30);
+      }
+    }
 
     // Check access permissions
     const machine = await Machine.findById(machineId).populate('departmentId');
@@ -549,7 +577,7 @@ router.get('/machine-stats/:machineId', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access denied to this machine' });
     }
 
-    const stats = await calculateMachineStats(machineId, period || '24h');
+    const stats = await calculateMachineStatsCustom(machineId, startDate, endDate);
     res.json({
       ...stats,
       currentStatus: machine.status
@@ -558,6 +586,91 @@ router.get('/machine-stats/:machineId', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
+// Helper function to calculate machine stats with custom date range
+async function calculateMachineStatsCustom(machineId, startDate, endDate) {
+  // Calculate production statistics
+  const productionRecords = await ProductionRecord.find({
+    machineId,
+    startTime: { $gte: startDate, $lte: endDate }
+  }).populate({
+    path: 'hourlyData.moldId',
+    model: 'Mold'
+  });
+
+  const totalUnitsProduced = productionRecords.reduce((sum, record) => 
+    sum + record.unitsProduced, 0
+  );
+
+  const totalDefectiveUnits = productionRecords.reduce((sum, record) => 
+    sum + record.defectiveUnits, 0
+  );
+
+  // Calculate time-based metrics and breakdown-specific metrics
+  let totalRunningMinutes = 0;
+  let totalStoppageMinutes = 0;
+  let totalStoppages = 0;
+  let breakdownStoppages = 0;
+  let totalBreakdownMinutes = 0;
+  let totalExpectedUnits = 0;
+
+  productionRecords.forEach(record => {
+    record.hourlyData.forEach(hourData => {
+      totalRunningMinutes += hourData.runningMinutes || 0;
+      totalStoppageMinutes += hourData.stoppageMinutes || 0;
+      totalStoppages += hourData.stoppages?.length || 0;
+
+      // Calculate expected units based on ACTUAL RUNNING TIME
+      if (hourData.moldId?.productionCapacityPerHour) {
+        const capacityPerMinute = hourData.moldId.productionCapacityPerHour / 60;
+        totalExpectedUnits += capacityPerMinute * (hourData.runningMinutes || 0);
+      }
+
+      // Count breakdown stoppages
+      hourData.stoppages?.forEach(stoppage => {
+        if (stoppage.reason === 'breakdown') {
+          breakdownStoppages++;
+          totalBreakdownMinutes += stoppage.duration || 0;
+        }
+      });
+    });
+  });
+
+  // Calculate availability
+  const totalAvailableMinutes = totalRunningMinutes + totalStoppageMinutes;
+  const availability = totalAvailableMinutes > 0 
+    ? (totalRunningMinutes / totalAvailableMinutes)
+    : 0;
+  
+  // Calculate quality: Goods without defect / total goods * 100
+  const quality = totalUnitsProduced > 0 ? (totalUnitsProduced - totalDefectiveUnits) / totalUnitsProduced : 0;
+  
+  // Then calculate performance:
+  const performance = totalExpectedUnits > 0 
+    ? (totalUnitsProduced / totalExpectedUnits)
+    : 0;
+  
+  const oee = availability * quality * performance;
+
+  // Calculate MTBF and MTTR based on breakdown stoppages only
+  const mtbf = breakdownStoppages > 0 ? totalRunningMinutes / breakdownStoppages : 0;
+  const mttr = breakdownStoppages > 0 ? totalBreakdownMinutes / breakdownStoppages : 0;
+
+  return {
+    totalUnitsProduced,
+    totalDefectiveUnits,
+    oee: Math.round(oee * 100),
+    mtbf: Math.round(mtbf), // in minutes
+    mttr: Math.round(mttr), // in minutes
+    availability: Math.round(availability * 100),
+    quality: Math.round(quality * 100),
+    performance: Math.round(performance * 100),
+    totalRunningMinutes,
+    totalStoppageMinutes,
+    breakdownStoppages,
+    totalBreakdownMinutes
+  };
+}
 
 // Get department statistics
 router.get('/department-stats/:departmentId', auth, async (req, res) => {

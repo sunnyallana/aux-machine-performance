@@ -23,6 +23,13 @@ const Dashboard: React.FC = () => {
     unclassifiedStoppages: 0,
     activeMachines: 0
   });
+  const [statsCache, setStatsCache] = useState<{
+    departments: { data: Department[], timestamp: number } | null,
+    factoryStats: { data: any, timestamp: number } | null
+  }>({
+    departments: null,
+    factoryStats: null
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user, isOperator } = useAuth();
@@ -30,8 +37,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchDepartments();
-    fetchFactoryStats();
+    fetchDashboardData();
     setupSocketListeners();
   }, []);
 
@@ -39,15 +45,15 @@ const Dashboard: React.FC = () => {
     socketService.connect();
 
     const handleProductionUpdate = () => {
-      fetchFactoryStats();
+      debouncedFactoryStatsUpdate();
     };
 
     const handleStoppageUpdate = () => {
-      fetchFactoryStats();
+      debouncedFactoryStatsUpdate();
     };
 
     const handleMachineStateUpdate = () => {
-      fetchFactoryStats();
+      debouncedFactoryStatsUpdate();
     };
 
     socketService.on('production-update', handleProductionUpdate);
@@ -63,11 +69,78 @@ const Dashboard: React.FC = () => {
     };
   };
 
+  // Debounced factory stats update
+  const debouncedFactoryStatsUpdate = (() => {
+    let timeout: NodeJS.Timeout;
+    return () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        fetchFactoryStats();
+      }, 3000); // Wait 3 seconds before updating
+    };
+  })();
+
+  const fetchDashboardData = async () => {
+    try {
+      const now = Date.now();
+      
+      // Check cache for departments (cache for 2 minutes)
+      if (statsCache.departments && (now - statsCache.departments.timestamp) < 120000) {
+        setDepartments(statsCache.departments.data);
+      } else {
+        await fetchDepartments();
+      }
+      
+      // Check cache for factory stats (cache for 1 minute)
+      if (statsCache.factoryStats && (now - statsCache.factoryStats.timestamp) < 60000) {
+        setFactoryStats(statsCache.factoryStats.data);
+      } else {
+        await fetchFactoryStats();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchDepartments = async () => {
     try {
       const data = await apiService.getDepartments();
+      
+      // Batch fetch department stats to reduce API calls
+      const statsPromises = data.map(async (dept: any) => {
+        try {
+          const stats = await apiService.getDepartmentStats(dept._id);
+          return { ...dept, avgOEE: stats.avgOEE };
+        } catch (error) {
+          console.error(`Failed to fetch stats for department ${dept._id}:`, error);
+          return { ...dept, avgOEE: 0 };
+        }
+      });
+      
+      const departmentsWithOEE = await Promise.all(statsPromises);
+      
+      setDepartments(departmentsWithOEE);
+      
+      // Update cache
+      setStatsCache(prev => ({
+        ...prev,
+        departments: {
+          data: departmentsWithOEE,
+          timestamp: Date.now()
+        }
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch departments');
+    }
+  };
+
+  const oldFetchDepartments = async () => {
+    try {
+      const data = await apiService.getDepartments();
       const departmentsWithOEE = await Promise.all(data.map(async (dept: any) => {
-      const stats = await apiService.getDepartmentStats(dept._id);
+        const stats = await apiService.getDepartmentStats(dept._id);
         return { ...dept, avgOEE: stats.avgOEE };
       }));
 
@@ -81,14 +154,23 @@ const Dashboard: React.FC = () => {
 
   const fetchFactoryStats = async () => {
     try {
-      // Get all machines and their stats
-      const machines = await apiService.getMachines();
+      // Check if we have cached factory stats
+      const now = Date.now();
+      if (statsCache.factoryStats && (now - statsCache.factoryStats.timestamp) < 60000) {
+        return; // Use cached data
+      }
+      
+      const [machines, unclassifiedData] = await Promise.all([
+        apiService.getMachines(),
+        apiService.request('/signals/unclassified-stoppages-count')
+      ]);
+      
       let totalUnits = 0;
       let totalOEE = 0;
       let activeMachines = 0;
 
-      // Get stats for each machine
-      const statsPromises = machines.map((machine: any) => 
+      // Batch fetch machine stats with error handling
+      const statsPromises = machines.map((machine: any) =>
         apiService.getMachineStats(machine._id, '24h').catch(() => null)
       );
       
@@ -104,15 +186,23 @@ const Dashboard: React.FC = () => {
         }
       });
 
-      // Get unclassified stoppages count
-      const unclassifiedData = await apiService.request('/signals/unclassified-stoppages-count');
-
-      setFactoryStats({
+      const newFactoryStats = {
         totalUnits,
         avgOEE: machines.length > 0 ? Math.round(totalOEE / machines.length) : 0,
         unclassifiedStoppages: unclassifiedData.count || 0,
         activeMachines
-      });
+      };
+      
+      setFactoryStats(newFactoryStats);
+      
+      // Update cache
+      setStatsCache(prev => ({
+        ...prev,
+        factoryStats: {
+          data: newFactoryStats,
+          timestamp: now
+        }
+      }));
     } catch (err) {
       console.error('Failed to fetch factory stats:', err);
     }

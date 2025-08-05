@@ -46,6 +46,8 @@ const DepartmentView: React.FC = () => {
   const [machineStatuses, setMachineStatuses] = useState<{[key: string]: string}>({});
   const layoutContainerRef = useRef<HTMLDivElement>(null);
   const [machineStats, setMachineStats] = useState<{[machineId: string]: MachineStats}>({});
+  const [statsCache, setStatsCache] = useState<{[machineId: string]: {stats: MachineStats, timestamp: number}}>({});
+  const [lastStatsUpdate, setLastStatsUpdate] = useState<number>(0);
   const dragOffset = useRef({ x: 0, y: 0 });
   const resizeInitial = useRef({ width: 0, height: 0, x: 0, y: 0 });
   const machinesRef = useRef<Machine[]>([]);
@@ -140,14 +142,15 @@ const DepartmentView: React.FC = () => {
     const handleProductionUpdate = (update: any) => {
       const machine = machinesRef.current.find(m => m._id === update.machineId);
       if (machine) {
-        fetchMachineStatsForMachine(update.machineId);
+        // Debounce stats updates to prevent excessive API calls
+        debouncedStatsUpdate(update.machineId);
       }
     };
 
     const handleStoppageUpdate = (update: any) => {
       const machine = machinesRef.current.find(m => m._id === update.machineId);
       if (machine) {
-        fetchMachineStatsForMachine(update.machineId);
+        debouncedStatsUpdate(update.machineId);
       }
     };
 
@@ -163,6 +166,26 @@ const DepartmentView: React.FC = () => {
       socketService.off('unclassified-stoppage-detected', handleStoppageUpdate);
     };
   };
+
+  // Debounced stats update to prevent excessive API calls
+  const debouncedStatsUpdate = (() => {
+    const timeouts = new Map<string, NodeJS.Timeout>();
+    
+    return (machineId: string) => {
+      // Clear existing timeout for this machine
+      if (timeouts.has(machineId)) {
+        clearTimeout(timeouts.get(machineId)!);
+      }
+      
+      // Set new timeout
+      const timeout = setTimeout(() => {
+        fetchMachineStatsForMachine(machineId);
+        timeouts.delete(machineId);
+      }, 2000); // Wait 2 seconds before updating
+      
+      timeouts.set(machineId, timeout);
+    };
+  })();
 
   const fetchDepartmentData = async () => {
     try {
@@ -194,10 +217,31 @@ const DepartmentView: React.FC = () => {
 
   const fetchMachineStatsForMachine = async (machineId: string) => {
     try {
+      // Check cache first (cache for 30 seconds)
+      const cached = statsCache[machineId];
+      const now = Date.now();
+      
+      if (cached && (now - cached.timestamp) < 30000) {
+        setMachineStats(prev => ({
+          ...prev,
+          [machineId]: cached.stats
+        }));
+        return;
+      }
+      
       const stats = await apiService.getMachineStats(machineId, '24h');
       setMachineStats(prev => ({
         ...prev,
         [machineId]: stats
+      }));
+      
+      // Update cache
+      setStatsCache(prev => ({
+        ...prev,
+        [machineId]: {
+          stats,
+          timestamp: now
+        }
       }));
     } catch (error) {
       console.error(`Failed to fetch stats for machine ${machineId}:`, error);
@@ -206,12 +250,46 @@ const DepartmentView: React.FC = () => {
 
   const fetchMachineStats = async () => {
     try {
-      const stats: {[machineId: string]: MachineStats} = {};
-      for (const machine of machines) {
-        const machineStats = await apiService.getMachineStats(machine._id, '24h');
-        stats[machine._id] = machineStats;
+      const now = Date.now();
+      
+      // Only fetch stats that aren't cached or are older than 30 seconds
+      const machinesToFetch = machines.filter(machine => {
+        const cached = statsCache[machine._id];
+        return !cached || (now - cached.timestamp) > 30000;
+      });
+      
+      if (machinesToFetch.length === 0) {
+        // All stats are cached and fresh
+        return;
       }
-      setMachineStats(stats);
+      
+      // Batch fetch stats for machines that need updates
+      const statsPromises = machinesToFetch.map(machine => 
+        apiService.getMachineStats(machine._id, '24h')
+          .then(stats => ({ machineId: machine._id, stats }))
+          .catch(error => {
+            console.error(`Failed to fetch stats for machine ${machine._id}:`, error);
+            return null;
+          })
+      );
+      
+      const results = await Promise.all(statsPromises);
+      const newStats: {[machineId: string]: MachineStats} = {};
+      const newCache: {[machineId: string]: {stats: MachineStats, timestamp: number}} = { ...statsCache };
+      
+      results.forEach(result => {
+        if (result) {
+          newStats[result.machineId] = result.stats;
+          newCache[result.machineId] = {
+            stats: result.stats,
+            timestamp: now
+          };
+        }
+      });
+      
+      setMachineStats(prev => ({ ...prev, ...newStats }));
+      setStatsCache(newCache);
+      setLastStatsUpdate(now);
     } catch (error) {
       console.error('Failed to fetch machine stats:', error);
     }
@@ -219,9 +297,13 @@ const DepartmentView: React.FC = () => {
 
   useEffect(() => {
     if (machines.length > 0) {
-      fetchMachineStats();
+      // Only fetch if we don't have recent stats
+      const now = Date.now();
+      if (now - lastStatsUpdate > 30000) {
+        fetchMachineStats();
+      }
     }
-  }, [machines]);
+  }, [machines, lastStatsUpdate]);
 
   const handleMachineClick = (machineId: string) => {
     if (!editLayoutMode) {
