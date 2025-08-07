@@ -1,8 +1,5 @@
 # LineSentry - Real-Time Machine Analytics Platform
 
-![RaspberryAndPlcOnSunmine'sPanel](https://github.com/user-attachments/assets/b0f91650-aa3b-4ba2-843a-97636a556941)
-
-
 ## Table of Contents
 - [Overview](#overview)
 - [Problem Statement](#problem-statement)
@@ -152,3 +149,7 @@ LineSentry leverages PLCs + Raspberry Pi to ingest real-time signals from generi
 - **Dashboard:**
   - Monitor factory/department OEE at a glance.
   - Click machines to analyze trends or update production logs.
+ 
+
+![RaspberryAndPlcOnSunmine'sPanel](https://github.com/user-attachments/assets/b0f91650-aa3b-4ba2-843a-97636a556941)
+
