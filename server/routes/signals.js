@@ -17,7 +17,6 @@ const machineStates = new Map(); // Track machine states
 const pendingStoppages = new Map(); // Track machines with pending stoppages
 const machineRunningMinutes = new Map(); // Track running minutes per machine
 const unclassifiedStoppages = new Map(); // Track unclassified stoppages
-const lastEmittedStates = new Map(); // Track last emitted states to prevent duplicate emissions
 
 // Get configuration for timeouts
 const getSignalTimeouts = async () => {
@@ -219,109 +218,20 @@ async function updateMachineStates(pinMappings, currentTime, io, timeouts) {
       console.error('Error updating machine status in database:', error);
     }
 
-    // Only emit if state actually changed
-    const lastState = lastEmittedStates.get(machineId);
-    const currentStateKey = `${machineStatus}-${hasPower}-${hasCycle}`;
-    
-    if (lastState !== currentStateKey) {
-      lastEmittedStates.set(machineId, currentStateKey);
-      
-      // Emit machine state update
-      io.emit('machine-state-update', {
-        machineId,
-        status: machineStatus,
-        color: statusColor,
-        hasPower,
-        hasCycle,
-        dbStatus: machineStatus,
-        timestamp: currentTime
-      });
-    }
-  }
-}
-
-// Batch emit function to reduce socket emissions
-const batchEmit = (() => {
-  const pendingEmissions = new Map();
-  let timeout = null;
-  
-  return (io, event, data) => {
-    const key = `${event}-${data.machineId}`;
-    pendingEmissions.set(key, { event, data });
-    
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-    
-    timeout = setTimeout(() => {
-      pendingEmissions.forEach(({ event, data }) => {
-        io.emit(event, data);
-      });
-      pendingEmissions.clear();
-      timeout = null;
-    }, 100); // Batch emissions every 100ms
-  };
-})();
-
-async function updateRunningMinutes(machineId, currentTime, io) {
-  try {
-    const currentHour = currentTime.getHours();
-    const currentDate = currentTime.toISOString().split('T')[0];
-    
-    // Find or create production record for today
-    let productionRecord = await ProductionRecord.findOne({
+    // Emit machine state update
+    io.emit('machine-state-update', {
       machineId,
-      startTime: {
-        $gte: new Date(currentDate + 'T00:00:00.000Z'),
-        $lt: new Date(currentDate + 'T23:59:59.999Z')
-      }
-    });
-
-    if (!productionRecord) {
-      productionRecord = new ProductionRecord({
-        machineId,
-        startTime: new Date(currentDate + 'T00:00:00.000Z'),
-        hourlyData: []
-      });
-    }
-
-    // Find or create hourly data
-    let hourData = productionRecord.hourlyData.find(h => h.hour === currentHour);
-    if (!hourData) {
-      hourData = {
-        hour: currentHour,
-        unitsProduced: 0,
-        defectiveUnits: 0,
-        status: 'running',
-        runningMinutes: 0,
-        stoppageMinutes: 0,
-        stoppages: []
-      };
-      productionRecord.hourlyData.push(hourData);
-    }
-
-    // Increment running minutes
-    hourData.runningMinutes = Math.min(60, (hourData.runningMinutes || 0) + 1);
-    hourData.status = 'running';
-    
-    await productionRecord.save();
-
-    // Use batched emit to reduce socket traffic
-    batchEmit(io, 'running-time-update', {
-      machineId: machineId.toString(),
-      hour: currentHour,
-      date: currentDate,
-      runningMinutes: hourData.runningMinutes,
+      status: machineStatus,
+      color: statusColor,
+      hasPower,
+      hasCycle,
+      dbStatus: machineStatus,
       timestamp: currentTime
     });
-
-  } catch (error) {
-    console.error('Error updating running minutes:', error);
   }
 }
 
-// Remove the old updateRunningMinutes function and replace with optimized version
-const oldUpdateRunningMinutes = async (machineId, currentTime, io) => {
+async function updateRunningMinutes(machineId, currentTime, io) {
   try {
     const currentHour = currentTime.getHours();
     const currentDate = currentTime.toISOString().split('T')[0];
@@ -447,7 +357,7 @@ async function createPendingStoppage(machineId, currentTime, io) {
       });
 
       // Emit socket event
-      batchEmit(io, 'unclassified-stoppage-detected', {
+      io.emit('unclassified-stoppage-detected', {
         machineId: machineId.toString(),
         hour: currentHour,
         date: currentDate,
@@ -489,7 +399,7 @@ async function resolvePendingStoppage(machineId, currentTime, io) {
     }
 
     // Emit stoppage resolved event
-    batchEmit(io, 'stoppage-resolved', {
+    io.emit('stoppage-resolved', {
       machineId: machineId.toString(),
       timestamp: currentTime
     });
@@ -528,7 +438,7 @@ async function updateOngoingStoppages(currentTime, io) { // FIX: Add io paramete
             await productionRecord.save();
             
             // Emit update to frontend
-            batchEmit(io, 'stoppage-updated', {
+            io.emit('stoppage-updated', {
               machineId,
               hour,
               date,
@@ -619,8 +529,8 @@ async function updateProductionRecord(machineId, currentTime, io) {
     productionRecord.lastActivityTime = currentTime;
     await productionRecord.save();
 
-    // Use batched emit for production updates
-    batchEmit(io, 'production-update', {
+    // Emit socket event for real-time updates
+    io.emit('production-update', {
       machineId: machineId.toString(),
       hour: currentHour,
       date: currentDate,

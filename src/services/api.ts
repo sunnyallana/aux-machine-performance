@@ -237,27 +237,9 @@ class ApiService {
     return this.request(`/analytics/production-timeline/${machineId}`);
   }
 
-  async getProductionTimelineCustom(machineId: string, startDate: Date, endDate: Date) {
-    return this.request(`/analytics/production-timeline/${machineId}`, {
-      params: {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
-      }
-    });
-  }
-
   async getMachineStats(machineId: string, period: string = '24h') {
     return this.request(`/analytics/machine-stats/${machineId}`, {
       params: { period }
-    });
-  }
-
-  async getMachineStatsCustom(machineId: string, startDate: Date, endDate: Date) {
-    return this.request(`/analytics/machine-stats/${machineId}`, {
-      params: {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
-      }
     });
   }
 

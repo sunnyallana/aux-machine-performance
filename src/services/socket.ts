@@ -3,8 +3,6 @@ import { io, Socket } from 'socket.io-client';
 class SocketService {
   private socket: Socket | null = null;
   private listeners: Map<string, Function[]> = new Map();
-  private eventQueue: Array<{event: string, data: any}> = [];
-  private batchTimeout: NodeJS.Timeout | null = null;
 
   connect() {
     if (this.socket?.connected) return;
@@ -37,55 +35,14 @@ class SocketService {
   }
 
   on(event: string, callback: Function) {
-    // Wrap callback to batch similar events
-    const wrappedCallback = (data: any) => {
-      // For high-frequency events, batch them
-      if (['production-update', 'machine-state-update', 'stoppage-updated'].includes(event)) {
-        this.queueEvent(event, data, callback);
-      } else {
-        callback(data);
-      }
-    };
-    
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
-    this.listeners.get(event)!.push(wrappedCallback);
+    this.listeners.get(event)!.push(callback);
 
     if (this.socket?.connected) {
-      this.socket.on(event, wrappedCallback as any);
+      this.socket.on(event, callback as any);
     }
-  }
-
-  private queueEvent(event: string, data: any, callback: Function) {
-    this.eventQueue.push({ event, data });
-    
-    // Clear existing timeout
-    if (this.batchTimeout) {
-      clearTimeout(this.batchTimeout);
-    }
-    
-    // Process queue after 500ms of no new events
-    this.batchTimeout = setTimeout(() => {
-      this.processBatchedEvents(callback);
-      this.eventQueue = [];
-      this.batchTimeout = null;
-    }, 500);
-  }
-
-  private processBatchedEvents(callback: Function) {
-    // Group events by machineId to avoid duplicate updates
-    const groupedEvents = new Map<string, any>();
-    
-    this.eventQueue.forEach(({ event, data }) => {
-      const key = `${event}-${data.machineId}`;
-      groupedEvents.set(key, data);
-    });
-    
-    // Process only the latest event for each machine
-    groupedEvents.forEach(data => {
-      callback(data);
-    });
   }
 
   off(event: string, callback?: Function) {

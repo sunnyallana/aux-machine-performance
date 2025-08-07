@@ -5,7 +5,7 @@ import apiService from '../services/api';
 import socketService from '../services/socket';
 import ProductionTimeline from './ProductionTimeline';
 import { ToastContainer, toast } from 'react-toastify';
-import { format, subDays, subWeeks, subMonths } from 'date-fns';
+import { format } from 'date-fns';
 import 'react-toastify/dist/ReactToastify.css';
 import {
   ArrowLeft,
@@ -18,8 +18,6 @@ import {
   ZapOff,
   Edit,
   Info,
-  Calendar,
-  RefreshCw
 } from 'lucide-react';
 import { ThemeContext } from '../App';
 
@@ -31,12 +29,7 @@ const MachineView: React.FC = () => {
   const [timeline, setTimeline] = useState<ProductionTimelineDay[]>([]);
   const [stats, setStats] = useState<MachineStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState('7d');
-  const [customDateRange, setCustomDateRange] = useState({
-    startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd')
-  });
-  const [showCustomRange, setShowCustomRange] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState('24h');
   const [machineStatus, setMachineStatus] = useState<string>('inactive');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -45,8 +38,6 @@ const MachineView: React.FC = () => {
   });
   const [warnings, setWarnings] = useState<string[]>([]);
   const [currentLocalTime, setCurrentLocalTime] = useState(new Date());
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastFetch, setLastFetch] = useState<Date | null>(null);
   // Tooltip state
   const [tooltip, setTooltip] = useState<{
     content: string;
@@ -106,14 +97,7 @@ const MachineView: React.FC = () => {
         socketService.leaveMachine(id);
       }
     };
-  }, [id]);
-
-  // Separate effect for period changes to avoid unnecessary refetches
-  useEffect(() => {
-    if (id && machine) {
-      fetchTimelineAndStats();
-    }
-  }, [selectedPeriod, customDateRange]);
+  }, [id, selectedPeriod]);
 
   // useEffect for time updates
   useEffect(() => {
@@ -160,14 +144,8 @@ const MachineView: React.FC = () => {
 
     const handleProductionUpdate = (update: any) => {
       if (update.machineId === id) {
-        // Only refresh if the update is within our current time range
-        const updateDate = new Date(update.timestamp);
-        const { startDate, endDate } = getDateRange();
-        
-        if (updateDate >= startDate && updateDate <= endDate) {
-          // Debounce stats refresh to avoid too many requests
-          debouncedStatsRefresh();
-        }
+        // Refresh stats when production updates
+        fetchStats();
       }
     };
 
@@ -189,14 +167,7 @@ const MachineView: React.FC = () => {
           };
         }));
         
-        // Only refresh stats if assignment is within current time range
-        const assignmentDate = new Date(update.date);
-        const { startDate, endDate } = getDateRange();
-        
-        if (assignmentDate >= startDate && assignmentDate <= endDate) {
-          debouncedStatsRefresh();
-        }
-        
+        fetchStats();
         // Remove warnings for updated hours
         setWarnings(prev => prev.filter(w => 
           !update.hours.includes(parseInt(w.split(' ')[4]))
@@ -206,12 +177,7 @@ const MachineView: React.FC = () => {
 
     const handleStoppageUpdated = (update: any) => {
       if (update.machineId === id) {
-        const stoppageDate = new Date(update.date || update.timestamp);
-        const { startDate, endDate } = getDateRange();
-        
-        if (stoppageDate >= startDate && stoppageDate <= endDate) {
-          debouncedStatsRefresh();
-        }
+        fetchStats();
       }
     };
 
@@ -252,163 +218,36 @@ const MachineView: React.FC = () => {
     };
   };
 
-  // Debounced stats refresh to prevent excessive API calls
-  const debouncedStatsRefresh = (() => {
-    let timeout: NodeJS.Timeout;
-    return () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        fetchStats();
-      }, 1000); // Wait 1 second before refreshing
-    };
-  })();
-
-  const getDateRange = () => {
-    if (selectedPeriod === 'custom') {
-      return {
-        startDate: new Date(customDateRange.startDate),
-        endDate: new Date(customDateRange.endDate)
-      };
-    }
-    
-    const endDate = new Date();
-    let startDate: Date;
-    
-    switch (selectedPeriod) {
-      case '24h':
-        startDate = subDays(endDate, 1);
-        break;
-      case '7d':
-        startDate = subDays(endDate, 7);
-        break;
-      case '30d':
-        startDate = subDays(endDate, 30);
-        break;
-      case '3m':
-        startDate = subMonths(endDate, 3);
-        break;
-      case '6m':
-        startDate = subMonths(endDate, 6);
-        break;
-      case '1y':
-        startDate = subMonths(endDate, 12);
-        break;
-      default:
-        startDate = subDays(endDate, 7);
-    }
-    
-    return { startDate, endDate };
-  };
-
   const fetchMachineData = async () => {
     try {
       setLoading(true);
-      const machineData = await apiService.getMachine(id!);
+      const [machineData, timelineData, statsData] = await Promise.all([
+        apiService.getMachine(id!),
+        apiService.getProductionTimeline(id!),
+        apiService.getMachineStats(id!, selectedPeriod)
+      ]);
       
       setMachine(machineData);
       setEditForm({
         name: machineData.name,
         description: machineData.description || ''
       });
-      
-      // Fetch timeline and stats separately to allow for different time ranges
-      await fetchTimelineAndStats();
-      setLastFetch(new Date());
+      setTimeline(timelineData);
+      setStats(statsData);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch machine data';
       toast.error(message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchTimelineAndStats = async () => {
-    try {
-      const { startDate, endDate } = getDateRange();
-      
-      const [timelineData, statsData] = await Promise.all([
-        apiService.getProductionTimelineCustom(id!, startDate, endDate),
-        apiService.getMachineStatsCustom(id!, startDate, endDate)
-      ]);
-      
-      setTimeline(timelineData);
-      setStats(statsData);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch timeline and stats';
-      toast.error(message);
     }
   };
 
   const fetchStats = async () => {
     try {
-      const { startDate, endDate } = getDateRange();
-      const statsData = await apiService.getMachineStatsCustom(id!, startDate, endDate);
+      const statsData = await apiService.getMachineStats(id!, selectedPeriod);
       setStats(statsData);
     } catch (err) {
       console.error('Failed to fetch stats:', err);
-    }
-  };
-
-  const handleRefresh = async () => {
-    try {
-      setRefreshing(true);
-      await fetchTimelineAndStats();
-      setLastFetch(new Date());
-      toast.success('Data refreshed');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to refresh data';
-      toast.error(message);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const handlePeriodChange = (period: string) => {
-    setSelectedPeriod(period);
-    if (period !== 'custom') {
-      setShowCustomRange(false);
-    } else {
-      setShowCustomRange(true);
-    }
-  };
-
-  const handleCustomDateChange = (field: 'startDate' | 'endDate', value: string) => {
-    setCustomDateRange(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const applyCustomRange = () => {
-    if (new Date(customDateRange.startDate) > new Date(customDateRange.endDate)) {
-      toast.error('Start date cannot be after end date');
-      return;
-    }
-    fetchTimelineAndStats();
-  };
-
-  // Remove the old fetchMachineData call and replace with optimized version
-  const oldFetchMachineData = async () => {
-    try {
-      setLoading(true);
-      const [machineData, timelineData, statsData] = await Promise.all([
-        apiService.getMachine(id!),
-        apiService.getProductionTimelineCustom(id!, ...Object.values(getDateRange())),
-        apiService.getMachineStatsCustom(id!, ...Object.values(getDateRange()))
-      ]);
-      
-      setMachine(machineData);
-      setEditForm({
-        name: machineData.name,
-        description: machineData.description || ''
-      });
-      setTimeline(timelineData);
-      setStats(statsData);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch machine data';
-      toast.error(message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -419,13 +258,7 @@ const MachineView: React.FC = () => {
         machineId: id
       });
       toast.success('Stoppage recorded successfully');
-      // Only refresh if stoppage is within current time range
-      const stoppageDate = new Date(stoppage.date);
-      const { startDate, endDate } = getDateRange();
-      
-      if (stoppageDate >= startDate && stoppageDate <= endDate) {
-        fetchTimelineAndStats();
-      }
+      fetchMachineData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message :'Failed to record stoppage');
     }
@@ -440,14 +273,8 @@ const MachineView: React.FC = () => {
         ...data
       });
       toast.success('Production data updated');
-      
-      // Only refresh if update is within current time range
-      const updateDate = new Date(date);
-      const { startDate, endDate } = getDateRange();
-      
-      if (updateDate >= startDate && updateDate <= endDate) {
-        fetchTimelineAndStats();
-      }
+      fetchStats();
+      fetchMachineData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message :'Failed to update production data');
     }
@@ -690,45 +517,17 @@ const MachineView: React.FC = () => {
       </div>
 
       {/* Time Period Selector */}
-      <div className={`rounded-lg border p-4 ${cardBgClass} ${cardBorderClass}`}>
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <Calendar className={`h-5 w-5 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
-            <div>
-              <h3 className={`text-lg font-semibold ${textClass}`}>Time Range</h3>
-              <p className={`text-sm ${textSecondaryClass}`}>
-                {lastFetch && `Last updated: ${format(lastFetch, 'HH:mm:ss')}`}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className={`p-2 ${textSecondaryClass} hover:${textClass} hover:${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-md transition-colors`}
-              title="Refresh data"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-        
-        <div className="mt-4 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <span className={`text-sm ${textSecondaryClass} self-center`}>Quick Select:</span>
+      <div className="flex items-center space-x-2">
+        <span className={`text-sm ${textSecondaryClass}`}>Time Period:</span>
+        <div className="flex space-x-1">
           {[
             { value: '24h', label: '24 Hours' },
-              { value: '7d', label: '7 Days' },
-              { value: '30d', label: '30 Days' },
-              { value: '3m', label: '3 Months' },
-              { value: '6m', label: '6 Months' },
-              { value: '1y', label: '1 Year' },
-              { value: 'custom', label: 'Custom Range' }
+            { value: '7d', label: '7 Days' },
+            { value: '30d', label: '30 Days' }
           ].map((period) => (
             <button
               key={period.value}
-                onClick={() => handlePeriodChange(period.value)}
+              onClick={() => setSelectedPeriod(period.value)}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
                 selectedPeriod === period.value
                   ? 'bg-blue-600 text-white'
@@ -738,44 +537,6 @@ const MachineView: React.FC = () => {
               {period.label}
             </button>
           ))}
-        </div>
-          
-          {showCustomRange && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg border border-dashed border-gray-300">
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={customDateRange.startDate}
-                  onChange={(e) => handleCustomDateChange('startDate', e.target.value)}
-                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
-              </div>
-              
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${textSecondaryClass}`}>
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={customDateRange.endDate}
-                  onChange={(e) => handleCustomDateChange('endDate', e.target.value)}
-                  className={`w-full px-3 py-2 ${inputBgClass} border ${inputBorderClass} rounded-md ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
-              </div>
-              
-              <div className="flex items-end">
-                <button
-                  onClick={applyCustomRange}
-                  className={`w-full px-4 py-2 ${buttonPrimaryClass} text-white rounded-md transition-colors`}
-                >
-                  Apply Range
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -977,7 +738,6 @@ const MachineView: React.FC = () => {
           <ProductionTimeline 
             data={timeline} 
             machineId={id!}
-            dateRange={getDateRange()}
             onAddStoppage={handleAddStoppage}
             onUpdateProduction={handleUpdateProduction}
           />
