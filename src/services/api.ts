@@ -243,17 +243,6 @@ class ApiService {
     });
   }
 
-  async getMachineStatsCustom(machineId: string, startDate: string, endDate: string) {
-    return this.request(`/analytics/machine-stats/${machineId}/custom`, {
-      params: { startDate, endDate }
-    });
-  }
-
-  async getProductionTimelineCustom(machineId: string, startDate: string, endDate: string) {
-    return this.request(`/analytics/production-timeline/${machineId}/custom`, {
-      params: { startDate, endDate }
-    });
-  }
   async addStoppageRecord(stoppage: any) {
     return this.request('/analytics/stoppage', {
       method: 'POST',
