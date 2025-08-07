@@ -6,7 +6,9 @@ import socketService from '../services/socket';
 import ProductionTimeline from './ProductionTimeline';
 import { ToastContainer, toast } from 'react-toastify';
 import { format } from 'date-fns';
+import DatePicker from 'react-datepicker';
 import 'react-toastify/dist/ReactToastify.css';
+import 'react-datepicker/dist/react-datepicker.css';
 import {
   ArrowLeft,
   Activity,
@@ -18,6 +20,8 @@ import {
   ZapOff,
   Edit,
   Info,
+  Calendar,
+  Search
 } from 'lucide-react';
 import { ThemeContext } from '../App';
 
@@ -38,6 +42,10 @@ const MachineView: React.FC = () => {
   });
   const [warnings, setWarnings] = useState<string[]>([]);
   const [currentLocalTime, setCurrentLocalTime] = useState(new Date());
+  const [showCustomDateRange, setShowCustomDateRange] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
+  const [applyingCustomRange, setApplyingCustomRange] = useState(false);
   // Tooltip state
   const [tooltip, setTooltip] = useState<{
     content: string;
@@ -298,6 +306,43 @@ const MachineView: React.FC = () => {
     }
   };
 
+  const handleCustomDateRangeApply = async () => {
+    if (!customStartDate || !customEndDate) {
+      toast.error('Please select both start and end dates');
+      return;
+    }
+
+    if (customStartDate > customEndDate) {
+      toast.error('Start date cannot be after end date');
+      return;
+    }
+
+    try {
+      setApplyingCustomRange(true);
+      
+      // Format dates for API
+      const startDateStr = format(customStartDate, 'yyyy-MM-dd');
+      const endDateStr = format(customEndDate, 'yyyy-MM-dd');
+      
+      // Fetch custom range data
+      const [timelineData, statsData] = await Promise.all([
+        apiService.getProductionTimelineCustom(id!, startDateStr, endDateStr),
+        apiService.getMachineStatsCustom(id!, startDateStr, endDateStr)
+      ]);
+      
+      setTimeline(timelineData);
+      setStats(statsData);
+      setSelectedPeriod('custom');
+      
+      toast.success(`Data loaded for ${format(customStartDate, 'MMM dd')} - ${format(customEndDate, 'MMM dd, yyyy')}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch custom range data';
+      toast.error(message);
+    } finally {
+      setApplyingCustomRange(false);
+    }
+  };
+
   const getStatusColor = (status: MachineStatus) => {
     switch (status) {
       case 'running': return 'text-green-400 bg-green-400/10 border-green-400/20';
@@ -517,27 +562,103 @@ const MachineView: React.FC = () => {
       </div>
 
       {/* Time Period Selector */}
-      <div className="flex items-center space-x-2">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
         <span className={`text-sm ${textSecondaryClass}`}>Time Period:</span>
-        <div className="flex space-x-1">
+        <div className="flex flex-wrap gap-2">
           {[
             { value: '24h', label: '24 Hours' },
             { value: '7d', label: '7 Days' },
-            { value: '30d', label: '30 Days' }
+            { value: '30d', label: '30 Days' },
+            { value: 'custom', label: 'Custom Range' }
           ].map((period) => (
             <button
               key={period.value}
-              onClick={() => setSelectedPeriod(period.value)}
+              onClick={() => {
+                if (period.value === 'custom') {
+                  setShowCustomDateRange(!showCustomDateRange);
+                } else {
+                  setSelectedPeriod(period.value);
+                  setShowCustomDateRange(false);
+                }
+              }}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                selectedPeriod === period.value
+                selectedPeriod === period.value || (period.value === 'custom' && showCustomDateRange)
                   ? 'bg-blue-600 text-white'
                   : `${buttonSecondaryClass}`
               }`}
             >
+              {period.value === 'custom' && <Calendar className="h-4 w-4 mr-1 inline" />}
               {period.label}
             </button>
           ))}
         </div>
+        
+        {/* Custom Date Range Selector */}
+        {showCustomDateRange && (
+          <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-lg border ${cardBgClass} ${cardBorderClass}`}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex flex-col">
+                <label className={`text-xs font-medium mb-1 ${textSecondaryClass}`}>Start Date</label>
+                <DatePicker
+                  selected={customStartDate}
+                  onChange={(date) => setCustomStartDate(date)}
+                  selectsStart
+                  startDate={customStartDate}
+                  endDate={customEndDate}
+                  maxDate={new Date()}
+                  dateFormat="MMM dd, yyyy"
+                  className={`px-3 py-2 text-sm rounded-md border ${inputBgClass} ${inputBorderClass} ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  placeholderText="Select start date"
+                />
+              </div>
+              
+              <div className="flex flex-col">
+                <label className={`text-xs font-medium mb-1 ${textSecondaryClass}`}>End Date</label>
+                <DatePicker
+                  selected={customEndDate}
+                  onChange={(date) => setCustomEndDate(date)}
+                  selectsEnd
+                  startDate={customStartDate}
+                  endDate={customEndDate}
+                  minDate={customStartDate}
+                  maxDate={new Date()}
+                  dateFormat="MMM dd, yyyy"
+                  className={`px-3 py-2 text-sm rounded-md border ${inputBgClass} ${inputBorderClass} ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  placeholderText="Select end date"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-2 sm:mt-0">
+              <button
+                onClick={handleCustomDateRangeApply}
+                disabled={applyingCustomRange || !customStartDate || !customEndDate}
+                className={`flex items-center space-x-2 px-4 py-2 ${buttonPrimaryClass} text-white rounded-md disabled:opacity-50 transition-colors text-sm`}
+              >
+                {applyingCustomRange ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                <span>{applyingCustomRange ? 'Loading...' : 'Apply'}</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowCustomDateRange(false);
+                  setCustomStartDate(null);
+                  setCustomEndDate(null);
+                  if (selectedPeriod === 'custom') {
+                    setSelectedPeriod('24h');
+                  }
+                }}
+                className={`px-3 py-2 border ${buttonSecondaryClass} rounded-md text-sm`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Detailed Metrics */}
@@ -738,6 +859,9 @@ const MachineView: React.FC = () => {
           <ProductionTimeline 
             data={timeline} 
             machineId={id!}
+            selectedPeriod={selectedPeriod}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
             onAddStoppage={handleAddStoppage}
             onUpdateProduction={handleUpdateProduction}
           />
