@@ -1,5 +1,8 @@
 # LineSentry - Real-Time Machine Analytics Platform
 
+![RaspberryAndPlcOnSunmine'sPanel](https://github.com/user-attachments/assets/b0f91650-aa3b-4ba2-843a-97636a556941)
+
+
 ## Table of Contents
 - [Overview](#overview)
 - [Problem Statement](#problem-statement)
