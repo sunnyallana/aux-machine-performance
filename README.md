@@ -153,5 +153,8 @@ LineSentry leverages PLCs + Raspberry Pi to ingest real-time signals from generi
 
 ## 10. Pictures <a name="pictures"></a>
 
+![sunny-shaban-ali-work-environment](https://github.com/user-attachments/assets/ae0d5784-fb5f-40a3-a7b7-769c4d380bca)
+
+
 ![RaspberryAndPlcOnSunmine'sPanel](https://github.com/user-attachments/assets/b0f91650-aa3b-4ba2-843a-97636a556941)
 
